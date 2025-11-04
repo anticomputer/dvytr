@@ -15,10 +15,10 @@ DOCKER_PORT_MAPPINGS=(
     # "6379:6379"   # Redis
 )
 
-# Socat port forwarding inside container (optional)
+# Socat port forwarding inside container (optional, rarely needed)
 # Format: "container_listen_port:target_host:target_port"
-# Use this when a service binds to localhost only (e.g., 127.0.0.1:3000)
-# and you need Docker to access it. Socat forwards from 0.0.0.0 to localhost.
+# Use this ONLY when a service binds to localhost and cannot be configured otherwise.
+# For most dev servers (Vite, Next.js, etc.), use --host 0.0.0.0 flag instead!
 # Example: "3001:127.0.0.1:3000" forwards container 0.0.0.0:3001 -> 127.0.0.1:3000
 SOCAT_FORWARDS=(
     # "3001:127.0.0.1:3000"  # Forward to localhost-bound service
@@ -74,7 +74,11 @@ ADDITIONAL_VOLUMES=(
 #     "$HOME/.npmrc:/home/dev/.npmrc:ro"
 # )
 
-# Example: Vite dev server (binds to localhost only)
+# Example: Vite dev server (recommended: use --host flag)
 # CONTAINER_NAME="my-vite-app"
-# DOCKER_PORT_MAPPINGS=("5173:5174")  # Host 5173 -> Container 5174
-# SOCAT_FORWARDS=("5174:127.0.0.1:5173")  # Container 5174 -> Vite on 127.0.0.1:5173
+# DOCKER_PORT_MAPPINGS=("5173:5173")
+# Then run: vite --host 0.0.0.0
+#
+# Alternative (if you can't use --host flag):
+# DOCKER_PORT_MAPPINGS=("5173:5174")
+# SOCAT_FORWARDS=("5174:127.0.0.1:5173")

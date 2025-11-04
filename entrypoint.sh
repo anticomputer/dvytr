@@ -45,16 +45,6 @@ else
     chown -R dev:dev /home/dev 2>/dev/null || true
 fi
 
-# Prioritize IPv4 for localhost to ensure Node.js/Vite bind correctly
-# Reorder /etc/hosts so 127.0.0.1 comes before ::1
-if grep -q "^::1.*localhost" /etc/hosts && grep -q "^127.0.0.1.*localhost" /etc/hosts; then
-    grep -v "^::1.*localhost\|^127.0.0.1.*localhost" /etc/hosts > /tmp/hosts.new
-    echo -e "127.0.0.1\tlocalhost" >> /tmp/hosts.new
-    echo -e "::1\t\tlocalhost ip6-localhost ip6-loopback" >> /tmp/hosts.new
-    cat /tmp/hosts.new > /etc/hosts
-    rm /tmp/hosts.new
-fi
-
 # Start socat port forwards if configured
 # Expected format: SOCAT_FORWARD_0="5725:127.0.0.1:5724" SOCAT_FORWARD_1="8080:127.0.0.1:3000" etc.
 i=0

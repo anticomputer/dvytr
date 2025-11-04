@@ -37,10 +37,6 @@ RUN apt-get update && apt-get install -y \
     gosu \
     && rm -rf /var/lib/apt/lists/*
 
-# Prioritize IPv4 for localhost to ensure services bind correctly
-# This makes Node.js/Vite bind to 127.0.0.1 instead of ::1 when using "localhost"
-RUN echo "precedence ::ffff:0:0/96  100" >> /etc/gai.conf
-
 # Install C/C++ tools (gcc, g++, gdb)
 RUN apt-get update && apt-get install -y \
     gcc \
