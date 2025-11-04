@@ -1,0 +1,445 @@
+#!/usr/bin/env bash
+
+set -e
+
+VERSION="1.0.0"
+IMAGE_NAME="dvytr"
+CONTAINER_PREFIX="dvytr"
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Print colored output
+print_info() {
+    echo -e "${BLUE}[INFO]${NC} $1"
+}
+
+print_success() {
+    echo -e "${GREEN}[SUCCESS]${NC} $1"
+}
+
+print_warning() {
+    echo -e "${YELLOW}[WARNING]${NC} $1"
+}
+
+print_error() {
+    echo -e "${RED}[ERROR]${NC} $1"
+}
+
+# Get the directory where this script is located
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Default configuration
+CONFIG_FILE=".dvytr.conf"
+CONTAINER_NAME=""
+WORKSPACE_PATH="$(pwd)"
+PORTS=()
+ENV_VARS=()
+ADDITIONAL_VOLUMES=()
+
+# Load configuration from file if it exists
+load_config() {
+    local config_path="${WORKSPACE_PATH}/${CONFIG_FILE}"
+    if [[ -f "$config_path" ]]; then
+        print_info "Loading configuration from ${CONFIG_FILE}"
+        # Source the config file
+        # shellcheck disable=SC1090
+        source "$config_path"
+    fi
+}
+
+# Parse .env file and add variables to ENV_VARS array
+load_env_file() {
+    local env_file="${WORKSPACE_PATH}/.env"
+    if [[ -f "$env_file" ]]; then
+        print_info "Loading environment variables from .env"
+        local line_count=0
+        while IFS= read -r line || [[ -n "$line" ]]; do
+            # Skip empty lines and comments
+            [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
+
+            # Remove leading/trailing whitespace
+            line=$(echo "$line" | sed -e 's/^[[:space:]]//' -e 's/[[:space:]]$//')
+
+            # Check if line contains an assignment
+            if [[ "$line" =~ ^[A-Za-z_][A-Za-z0-9_]*= ]]; then
+                ENV_VARS+=("$line")
+                ((line_count++))
+            fi
+        done < "$env_file"
+
+        if [[ $line_count -gt 0 ]]; then
+            print_info "Loaded $line_count environment variable(s) from .env"
+        fi
+    fi
+}
+
+# Generate container name based on current directory
+generate_container_name() {
+    local dir_name
+    local path_hash
+
+    # Get directory name (sanitized)
+    dir_name=$(basename "$WORKSPACE_PATH" | tr '[:upper:]' '[:lower:]' | tr -cd '[:alnum:]-')
+
+    # Generate hash of full path (first 8 chars) for uniqueness
+    # This ensures different paths with same basename don't collide
+    if command -v md5sum >/dev/null 2>&1; then
+        path_hash=$(echo -n "$WORKSPACE_PATH" | md5sum | cut -c1-8)
+    elif command -v md5 >/dev/null 2>&1; then
+        # macOS uses 'md5' instead of 'md5sum'
+        path_hash=$(echo -n "$WORKSPACE_PATH" | md5 | cut -c1-8)
+    else
+        # Fallback: use simple hash if md5 not available
+        path_hash=$(printf '%s' "$WORKSPACE_PATH" | cksum | cut -d' ' -f1)
+    fi
+
+    echo "${CONTAINER_PREFIX}-${dir_name}-${path_hash}"
+}
+
+# Build the Docker image
+build_image() {
+    print_info "Building Docker image '${IMAGE_NAME}'..."
+
+    if [[ ! -f "${SCRIPT_DIR}/Dockerfile" ]]; then
+        print_error "Dockerfile not found at ${SCRIPT_DIR}/Dockerfile"
+        exit 1
+    fi
+
+    docker build -t "${IMAGE_NAME}:latest" "${SCRIPT_DIR}"
+    print_success "Docker image '${IMAGE_NAME}' built successfully"
+}
+
+# Check if image exists
+image_exists() {
+    docker image inspect "${IMAGE_NAME}:latest" >/dev/null 2>&1
+}
+
+# Check if container exists
+container_exists() {
+    docker container inspect "$1" >/dev/null 2>&1
+}
+
+# Check if container is running
+container_running() {
+    [[ "$(docker container inspect -f '{{.State.Running}}' "$1" 2>/dev/null)" == "true" ]]
+}
+
+# Start a new development container
+cmd_run() {
+    load_config
+    load_env_file
+
+    # Use custom name if provided, otherwise generate from directory
+    CONTAINER_NAME="${CONTAINER_NAME:-$(generate_container_name)}"
+
+    # Check if image exists, build if not
+    if ! image_exists; then
+        print_warning "Image '${IMAGE_NAME}' not found, building..."
+        build_image
+    fi
+
+    # Check if container already exists
+    if container_exists "$CONTAINER_NAME"; then
+        if container_running "$CONTAINER_NAME"; then
+            print_warning "Container '${CONTAINER_NAME}' is already running"
+            print_info "Use 'dvytr shell' to attach to it"
+            exit 0
+        else
+            print_info "Starting existing container '${CONTAINER_NAME}'..."
+            docker start "$CONTAINER_NAME"
+            print_success "Container '${CONTAINER_NAME}' started"
+            print_info "Use 'dvytr shell' to attach to it"
+            exit 0
+        fi
+    fi
+
+    # Build docker run command
+    local docker_args=(
+        "run"
+        "-it"
+        "-d"
+        "--name" "$CONTAINER_NAME"
+        "-v" "${WORKSPACE_PATH}:/workspace"
+        "-w" "/workspace"
+    )
+
+    # Add port mappings
+    for port in "${PORTS[@]}"; do
+        docker_args+=("-p" "$port")
+    done
+
+    # Add environment variables
+    for env in "${ENV_VARS[@]}"; do
+        docker_args+=("-e" "$env")
+    done
+
+    # Add additional volumes
+    for volume in "${ADDITIONAL_VOLUMES[@]}"; do
+        docker_args+=("-v" "$volume")
+    done
+
+    docker_args+=("${IMAGE_NAME}:latest")
+
+    print_info "Starting container '${CONTAINER_NAME}'..."
+    docker "${docker_args[@]}"
+
+    print_success "Container '${CONTAINER_NAME}' started successfully"
+    print_info "Workspace: ${WORKSPACE_PATH} -> /workspace"
+    print_info "Use 'dvytr shell' to attach to the container"
+}
+
+# Attach to running container
+cmd_shell() {
+    load_config
+    CONTAINER_NAME="${CONTAINER_NAME:-$(generate_container_name)}"
+
+    if ! container_exists "$CONTAINER_NAME"; then
+        print_error "Container '${CONTAINER_NAME}' does not exist"
+        print_info "Use 'dvytr run' to create it"
+        exit 1
+    fi
+
+    if ! container_running "$CONTAINER_NAME"; then
+        print_info "Container '${CONTAINER_NAME}' is not running, starting..."
+        docker start "$CONTAINER_NAME"
+    fi
+
+    print_info "Attaching to container '${CONTAINER_NAME}'..."
+    docker exec -it "$CONTAINER_NAME" /bin/bash
+}
+
+# Execute command in container
+cmd_exec() {
+    load_config
+    CONTAINER_NAME="${CONTAINER_NAME:-$(generate_container_name)}"
+
+    if [[ $# -eq 0 ]]; then
+        print_error "No command provided"
+        print_info "Usage: dvytr exec <command> [args...]"
+        exit 1
+    fi
+
+    if ! container_exists "$CONTAINER_NAME"; then
+        print_error "Container '${CONTAINER_NAME}' does not exist"
+        print_info "Use 'dvytr run' to create it"
+        exit 1
+    fi
+
+    if ! container_running "$CONTAINER_NAME"; then
+        print_info "Container '${CONTAINER_NAME}' is not running, starting..."
+        docker start "$CONTAINER_NAME"
+    fi
+
+    docker exec -it "$CONTAINER_NAME" "$@"
+}
+
+# Stop the container
+cmd_stop() {
+    load_config
+    CONTAINER_NAME="${CONTAINER_NAME:-$(generate_container_name)}"
+
+    if ! container_exists "$CONTAINER_NAME"; then
+        print_warning "Container '${CONTAINER_NAME}' does not exist"
+        exit 0
+    fi
+
+    if ! container_running "$CONTAINER_NAME"; then
+        print_warning "Container '${CONTAINER_NAME}' is already stopped"
+        exit 0
+    fi
+
+    print_info "Stopping container '${CONTAINER_NAME}'..."
+    docker stop "$CONTAINER_NAME"
+    print_success "Container '${CONTAINER_NAME}' stopped"
+}
+
+# Clean up container and optionally image
+cmd_clean() {
+    load_config
+    CONTAINER_NAME="${CONTAINER_NAME:-$(generate_container_name)}"
+
+    local remove_image=false
+    if [[ "$1" == "--image" ]] || [[ "$1" == "-i" ]]; then
+        remove_image=true
+    fi
+
+    # Remove container if it exists
+    if container_exists "$CONTAINER_NAME"; then
+        print_info "Removing container '${CONTAINER_NAME}'..."
+        docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1
+        print_success "Container '${CONTAINER_NAME}' removed"
+    else
+        print_warning "Container '${CONTAINER_NAME}' does not exist"
+    fi
+
+    # Remove image if requested
+    if [[ "$remove_image" == true ]]; then
+        if image_exists; then
+            print_info "Removing image '${IMAGE_NAME}'..."
+            docker rmi "${IMAGE_NAME}:latest"
+            print_success "Image '${IMAGE_NAME}' removed"
+        else
+            print_warning "Image '${IMAGE_NAME}' does not exist"
+        fi
+    fi
+}
+
+# List running dvytr containers
+cmd_list() {
+    print_info "DevYeeter containers:"
+    docker ps -a --filter "name=${CONTAINER_PREFIX}-" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+}
+
+# Show status of current container
+cmd_status() {
+    load_config
+    CONTAINER_NAME="${CONTAINER_NAME:-$(generate_container_name)}"
+
+    if ! container_exists "$CONTAINER_NAME"; then
+        print_warning "Container '${CONTAINER_NAME}' does not exist"
+        exit 0
+    fi
+
+    print_info "Container: ${CONTAINER_NAME}"
+    docker inspect "$CONTAINER_NAME" --format='Status: {{.State.Status}}
+Created: {{.Created}}
+Image: {{.Config.Image}}
+Workspace: {{range .Mounts}}{{if eq .Destination "/workspace"}}{{.Source}}{{end}}{{end}}'
+}
+
+# Show help
+cmd_help() {
+    cat <<EOF
+DevYeeter (dvytr) v${VERSION} - Multi-language Development Container Tool
+
+USAGE:
+    dvytr <command> [options]
+
+COMMANDS:
+    run             Start a new development container with current directory mounted
+    shell           Attach to the running container (opens bash shell)
+    exec <cmd>      Execute a command in the running container
+    stop            Stop the running container
+    clean [-i]      Remove the container (use -i to also remove the image)
+    list            List all dvytr containers
+    status          Show status of current container
+    build           Build/rebuild the Docker image
+    version         Show version information
+    help            Show this help message
+
+CONFIGURATION:
+    Create a .dvytr.conf file in your project directory to customize:
+
+    # Custom container name
+    CONTAINER_NAME="my-custom-name"
+
+    # Port mappings (host:container)
+    PORTS=("8080:8080" "3000:3000")
+
+    # Environment variables
+    ENV_VARS=("NODE_ENV=development" "DEBUG=true")
+
+    # Additional volume mounts
+    ADDITIONAL_VOLUMES=("/host/path:/container/path")
+
+ENVIRONMENT VARIABLES:
+    Create a .env file in your project directory to automatically load
+    environment variables into the container:
+
+    DATABASE_URL=postgresql://localhost:5432/mydb
+    API_KEY=your-secret-key
+    NODE_ENV=development
+
+    The .env file is automatically loaded when running 'dvytr run'
+
+EXAMPLES:
+    # Start a development container
+    dvytr run
+
+    # Attach to the container
+    dvytr shell
+
+    # Run a command in the container
+    dvytr exec npm install
+
+    # Stop the container
+    dvytr stop
+
+    # Remove container and image
+    dvytr clean --image
+
+INSTALLED TOOLS:
+    - C/C++ (gcc, g++, clang, gdb, valgrind)
+    - Python 3 (pip, venv)
+    - Node.js v20 (npm)
+    - pnpm (main package manager)
+    - TypeScript (tsc, ts-node)
+    - Go $(grep 'GO_VERSION=' "${SCRIPT_DIR}/Dockerfile" | cut -d'=' -f2 || echo "")
+    - Rust (cargo, rustc)
+    - Editors: vim, emacs, nano
+    - Tools: git, curl, wget, jq, tree, htop
+
+EOF
+}
+
+# Show version
+cmd_version() {
+    echo "DevYeeter (dvytr) v${VERSION}"
+}
+
+# Main command dispatcher
+main() {
+    if [[ $# -eq 0 ]]; then
+        cmd_help
+        exit 0
+    fi
+
+    local command=$1
+    shift
+
+    case "$command" in
+        run)
+            cmd_run "$@"
+            ;;
+        shell)
+            cmd_shell "$@"
+            ;;
+        exec)
+            cmd_exec "$@"
+            ;;
+        stop)
+            cmd_stop "$@"
+            ;;
+        clean)
+            cmd_clean "$@"
+            ;;
+        list|ls)
+            cmd_list "$@"
+            ;;
+        status)
+            cmd_status "$@"
+            ;;
+        build)
+            build_image "$@"
+            ;;
+        version|--version|-v)
+            cmd_version
+            ;;
+        help|--help|-h)
+            cmd_help
+            ;;
+        *)
+            print_error "Unknown command: $command"
+            echo ""
+            cmd_help
+            exit 1
+            ;;
+    esac
+}
+
+main "$@"
