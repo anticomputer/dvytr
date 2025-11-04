@@ -140,7 +140,7 @@ Create a `.dvytr.conf` file in your project directory to customize the container
 CONTAINER_NAME="my-custom-name"
 
 # Port mappings (host:container)
-PORTS=("8080:8080" "3000:3000")
+DOCKER_PORT_MAPPINGS=("8080:8080" "3000:3000")
 
 # Environment variables
 ENV_VARS=("NODE_ENV=development" "DEBUG=true")
@@ -282,7 +282,7 @@ node app.js         # Your app can access these env vars
 Create `.dvytr.conf`:
 
 ```bash
-PORTS=("8080:8080" "3000:3000")
+DOCKER_PORT_MAPPINGS=("8080:8080" "3000:3000")
 ```
 
 Then:
@@ -293,6 +293,29 @@ dvytr shell
 
 # Inside container, start your server on port 8080 or 3000
 # Access from host at localhost:8080 or localhost:3000
+```
+
+### With Vite Dev Server
+
+For Vite (or other dev servers), configure them to bind to all interfaces:
+
+```bash
+# .dvytr.conf
+DOCKER_PORT_MAPPINGS=("5173:5173")
+ENV_VARS=("VITE_HOST=0.0.0.0")
+```
+
+Then just run your dev server normally:
+
+```bash
+dvytr run
+dvytr shell
+
+# Inside container
+pnpm dev  # or npm run dev, vite, etc.
+# Vite automatically uses VITE_HOST=0.0.0.0
+
+# Access from host at localhost:5173
 ```
 
 ## How It Works

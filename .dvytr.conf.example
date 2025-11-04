@@ -74,11 +74,16 @@ ADDITIONAL_VOLUMES=(
 #     "$HOME/.npmrc:/home/dev/.npmrc:ro"
 # )
 
-# Example: Vite dev server (recommended: use --host flag)
+# Example: Vite dev server (recommended: use VITE_HOST env var)
 # CONTAINER_NAME="my-vite-app"
 # DOCKER_PORT_MAPPINGS=("5173:5173")
-# Then run: vite --host 0.0.0.0
+# ENV_VARS=(
+#     "VITE_HOST=0.0.0.0"
+# )
+# Then run: pnpm dev (or npm run dev, vite, etc.)
 #
-# Alternative (if you can't use --host flag):
-# DOCKER_PORT_MAPPINGS=("5173:5174")
-# SOCAT_FORWARDS=("5174:127.0.0.1:5173")
+# Alternative approaches:
+# 1. Use --host flag: vite --host 0.0.0.0
+# 2. If you can't configure the service at all:
+#    DOCKER_PORT_MAPPINGS=("5173:5174")
+#    SOCAT_FORWARDS=("5174:127.0.0.1:5173")
