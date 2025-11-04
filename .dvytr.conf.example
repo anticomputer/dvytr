@@ -5,13 +5,23 @@
 # If not set, it will be generated from the current directory name
 # CONTAINER_NAME="my-project-dev"
 
-# Port mappings (host:container)
-# Expose container ports to your host machine
-PORTS=(
+# Docker port mappings (host_port:container_port)
+# Maps host machine ports to container ports
+# Example: "8080:3000" means host port 8080 -> container port 3000
+DOCKER_PORT_MAPPINGS=(
     # "8080:8080"   # Web server
     # "3000:3000"   # Node.js dev server
     # "5432:5432"   # PostgreSQL
     # "6379:6379"   # Redis
+)
+
+# Socat port forwarding inside container (optional)
+# Format: "container_listen_port:target_host:target_port"
+# Use this when a service binds to localhost only (e.g., 127.0.0.1:3000)
+# and you need Docker to access it. Socat forwards from 0.0.0.0 to localhost.
+# Example: "3001:127.0.0.1:3000" forwards container 0.0.0.0:3001 -> 127.0.0.1:3000
+SOCAT_FORWARDS=(
+    # "3001:127.0.0.1:3000"  # Forward to localhost-bound service
 )
 
 # Environment variables
@@ -43,7 +53,7 @@ ADDITIONAL_VOLUMES=(
 
 # Example: Node.js project with PostgreSQL and AWS access
 # CONTAINER_NAME="my-node-app"
-# PORTS=("3000:3000" "5432:5432")
+# DOCKER_PORT_MAPPINGS=("3000:3000" "5432:5432")
 # ENV_VARS=(
 #     "NODE_ENV=development"
 #     "DATABASE_URL=postgres://user:pass@host.docker.internal:5432/mydb"
@@ -56,10 +66,15 @@ ADDITIONAL_VOLUMES=(
 
 # Example: Monorepo with private npm packages
 # CONTAINER_NAME="my-monorepo"
-# PORTS=("8080:8080")
+# DOCKER_PORT_MAPPINGS=("8080:8080")
 # ENV_VARS=(
 #     "PNPM_HOME=/home/dev/.local/share/pnpm"
 # )
 # ADDITIONAL_VOLUMES=(
 #     "$HOME/.npmrc:/home/dev/.npmrc:ro"
 # )
+
+# Example: Vite dev server (binds to localhost only)
+# CONTAINER_NAME="my-vite-app"
+# DOCKER_PORT_MAPPINGS=("5173:5174")  # Host 5173 -> Container 5174
+# SOCAT_FORWARDS=("5174:127.0.0.1:5173")  # Container 5174 -> Vite on 127.0.0.1:5173

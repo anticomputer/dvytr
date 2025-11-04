@@ -43,9 +43,10 @@ SCRIPT_DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
 CONFIG_FILE=".dvytr.conf"
 CONTAINER_NAME=""
 WORKSPACE_PATH="$(pwd)"
-PORTS=()
+DOCKER_PORT_MAPPINGS=()  # Format: "host_port:container_port"
 ENV_VARS=()
 ADDITIONAL_VOLUMES=()
+SOCAT_FORWARDS=()  # Format: "container_listen_port:target_host:target_port"
 
 # Load configuration from file if it exists
 load_config() {
@@ -175,13 +176,20 @@ cmd_run() {
     )
 
     # Add port mappings
-    for port in "${PORTS[@]}"; do
+    for port in "${DOCKER_PORT_MAPPINGS[@]}"; do
         docker_args+=("-p" "$port")
     done
 
     # Add environment variables
     for env in "${ENV_VARS[@]}"; do
         docker_args+=("-e" "$env")
+    done
+
+    # Add socat port forwards as environment variables
+    local i=0
+    for forward in "${SOCAT_FORWARDS[@]}"; do
+        docker_args+=("-e" "SOCAT_FORWARD_$i=$forward")
+        i=$((i + 1))
     done
 
     # Add additional volumes
@@ -216,7 +224,7 @@ cmd_shell() {
     fi
 
     print_info "Attaching to container '${CONTAINER_NAME}'..."
-    docker exec -it "$CONTAINER_NAME" /bin/bash
+    docker exec -it --user dev "$CONTAINER_NAME" /bin/bash
 }
 
 # Execute command in container
@@ -241,7 +249,7 @@ cmd_exec() {
         docker start "$CONTAINER_NAME"
     fi
 
-    docker exec -it "$CONTAINER_NAME" "$@"
+    docker exec -it --user dev "$CONTAINER_NAME" "$@"
 }
 
 # Stop the container

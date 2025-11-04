@@ -18,8 +18,14 @@ WORKSPACE_GID=$(stat -c '%g' /workspace 2>/dev/null || stat -f '%g' /workspace 2
 CURRENT_UID=$(id -u dev)
 CURRENT_GID=$(id -g dev)
 
-# Only adjust if there's a mismatch
-if [ "$WORKSPACE_UID" != "$CURRENT_UID" ] || [ "$WORKSPACE_GID" != "$CURRENT_GID" ]; then
+# On macOS Docker Desktop, mounted volumes appear as root-owned (UID=0)
+# In this case, keep dev user at UID=1000 since permission mapping is handled by Docker
+if [ "$WORKSPACE_UID" = "0" ]; then
+    echo "[dvytr] Detected macOS Docker Desktop (workspace shows as root), keeping dev user at UID=1000"
+    # Ensure /home/dev is owned by dev user
+    chown -R dev:dev /home/dev 2>/dev/null || true
+# Only adjust if there's a mismatch and not UID 0
+elif [ "$WORKSPACE_UID" != "$CURRENT_UID" ] || [ "$WORKSPACE_GID" != "$CURRENT_GID" ]; then
     echo "[dvytr] Adjusting dev user permissions: UID=$WORKSPACE_UID GID=$WORKSPACE_GID"
 
     # Modify the dev user's GID if needed
@@ -34,7 +40,42 @@ if [ "$WORKSPACE_UID" != "$CURRENT_UID" ] || [ "$WORKSPACE_GID" != "$CURRENT_GID
 
     # Fix ownership of dev user's home directory and important files
     chown -R "$WORKSPACE_UID:$WORKSPACE_GID" /home/dev 2>/dev/null || true
+else
+    # UIDs match, just ensure /home/dev permissions are correct
+    chown -R dev:dev /home/dev 2>/dev/null || true
 fi
+
+# Prioritize IPv4 for localhost to ensure Node.js/Vite bind correctly
+# Reorder /etc/hosts so 127.0.0.1 comes before ::1
+if grep -q "^::1.*localhost" /etc/hosts && grep -q "^127.0.0.1.*localhost" /etc/hosts; then
+    grep -v "^::1.*localhost\|^127.0.0.1.*localhost" /etc/hosts > /tmp/hosts.new
+    echo -e "127.0.0.1\tlocalhost" >> /tmp/hosts.new
+    echo -e "::1\t\tlocalhost ip6-localhost ip6-loopback" >> /tmp/hosts.new
+    cat /tmp/hosts.new > /etc/hosts
+    rm /tmp/hosts.new
+fi
+
+# Start socat port forwards if configured
+# Expected format: SOCAT_FORWARD_0="5725:127.0.0.1:5724" SOCAT_FORWARD_1="8080:127.0.0.1:3000" etc.
+i=0
+while true; do
+    var_name="SOCAT_FORWARD_$i"
+    forward="${!var_name}"
+
+    if [ -z "$forward" ]; then
+        break
+    fi
+
+    # Parse format: listen_port:target_host:target_port
+    listen_port=$(echo "$forward" | cut -d: -f1)
+    target_host=$(echo "$forward" | cut -d: -f2)
+    target_port=$(echo "$forward" | cut -d: -f3)
+
+    echo "[dvytr] Starting socat forward: 0.0.0.0:$listen_port -> $target_host:$target_port"
+    nohup socat TCP4-LISTEN:$listen_port,fork,bind=0.0.0.0,reuseaddr TCP4:$target_host:$target_port >/dev/null 2>&1 &
+
+    i=$((i + 1))
+done
 
 # Execute the command as the dev user
 exec gosu dev "$@"
