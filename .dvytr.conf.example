@@ -29,7 +29,37 @@ ADDITIONAL_VOLUMES=(
     # "/host/path:/container/path"
     # "$HOME/.ssh:/home/dev/.ssh:ro"  # SSH keys (read-only)
     # "$HOME/.gitconfig:/home/dev/.gitconfig:ro"  # Git config (read-only)
+    # "$HOME/.aws:/home/dev/.aws:ro"  # AWS credentials/config (read-only)
+    # "$HOME/.npmrc:/home/dev/.npmrc:ro"  # npm config for private registries (read-only)
+    # "/var/run/docker.sock:/var/run/docker.sock"  # Docker socket for docker/docker-compose commands
 )
 
 # Note: The current working directory is automatically mounted to /workspace
 # All configuration values are optional
+
+# ==============================================================================
+# ADVANCED EXAMPLES
+# ==============================================================================
+
+# Example: Node.js project with PostgreSQL and AWS access
+# CONTAINER_NAME="my-node-app"
+# PORTS=("3000:3000" "5432:5432")
+# ENV_VARS=(
+#     "NODE_ENV=development"
+#     "DATABASE_URL=postgres://user:pass@host.docker.internal:5432/mydb"
+#     "AWS_PROFILE=my-profile"
+# )
+# ADDITIONAL_VOLUMES=(
+#     "$HOME/.aws:/home/dev/.aws:ro"
+#     "/var/run/docker.sock:/var/run/docker.sock"
+# )
+
+# Example: Monorepo with private npm packages
+# CONTAINER_NAME="my-monorepo"
+# PORTS=("8080:8080")
+# ENV_VARS=(
+#     "PNPM_HOME=/home/dev/.local/share/pnpm"
+# )
+# ADDITIONAL_VOLUMES=(
+#     "$HOME/.npmrc:/home/dev/.npmrc:ro"
+# )
