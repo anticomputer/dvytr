@@ -75,7 +75,7 @@ load_env_file() {
             # Check if line contains an assignment
             if [[ "$line" =~ ^[A-Za-z_][A-Za-z0-9_]*= ]]; then
                 ENV_VARS+=("$line")
-                ((line_count++))
+                line_count=$((line_count + 1))
             fi
         done < "$env_file"
 
