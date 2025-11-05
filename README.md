@@ -10,7 +10,7 @@ A bash-based tool for spinning up fully-featured development Docker containers w
 - **Automatic Mounting**: Current directory auto-mounted to `/workspace`
 - **Dedicated User**: Non-root `dev` user with sudo access for better security
 - **Configurable**: Port forwarding, environment variables, and volume mounts
-- **Password Manager Integration**: Native support for passage and pass password managers with `passage:` and `pass:` syntax
+- **Password Manager Integration**: Native support for passage and pass password managers with `passage://` and `pass://` syntax
 - **Easy Management**: Simple commands for start, stop, shell access, and cleanup
 
 ## Prerequisites
@@ -333,18 +333,18 @@ DevYeeter integrates with popular Unix password managers, allowing you to secure
 
 **Usage:**
 
-Use the `passage:` or `pass:` prefix in environment variables to automatically retrieve secrets:
+Use the `passage://` or `pass://` prefix in environment variables to automatically retrieve secrets:
 
 ```bash
 # .dvytr.conf
 ENV_VARS=(
     "NODE_ENV=production"
     # Using passage:
-    "API_KEY=passage:services/myapp/api-key"
-    "DATABASE_PASSWORD=passage:databases/postgres/main"
+    "API_KEY=passage://services/myapp/api-key"
+    "DATABASE_PASSWORD=passage://databases/postgres/main"
     # Using pass:
-    "JWT_SECRET=pass:secrets/myapp/jwt"
-    "AWS_SECRET_ACCESS_KEY=pass:aws/credentials/secret"
+    "JWT_SECRET=pass://secrets/myapp/jwt"
+    "AWS_SECRET_ACCESS_KEY=pass://aws/credentials/secret"
 )
 ```
 
@@ -354,16 +354,16 @@ Or in your `.env` file:
 # .env
 NODE_ENV=development
 # Using passage (age encryption):
-API_KEY=passage:services/myapp/api-key
-DATABASE_PASSWORD=passage:databases/postgres/main
+API_KEY=passage://services/myapp/api-key
+DATABASE_PASSWORD=passage://databases/postgres/main
 # Using pass (GPG encryption):
-JWT_SECRET=pass:secrets/myapp/jwt
-AWS_SECRET_ACCESS_KEY=pass:aws/credentials/secret
+JWT_SECRET=pass://secrets/myapp/jwt
+AWS_SECRET_ACCESS_KEY=pass://aws/credentials/secret
 ```
 
 **How it works:**
 
-1. When you run `dvytr run`, DevYeeter detects any `passage:` or `pass:` prefixed values
+1. When you run `dvytr run`, DevYeeter detects any `passage://` or `pass://` prefixed values
 2. For each one, it runs `passage show <path>` or `pass show <path>` to retrieve the secret
 3. The secret replaces the reference before the container is created
 4. Secrets are passed securely to the container as environment variables
@@ -389,7 +389,7 @@ passage insert services/myapp/production-api
 # Enter your secret when prompted
 
 # Reference it in .dvytr.conf
-echo 'ENV_VARS=("API_KEY=passage:services/myapp/production-api")' > .dvytr.conf
+echo 'ENV_VARS=("API_KEY=passage://services/myapp/production-api")' > .dvytr.conf
 
 # Start container - you'll be prompted for passage password if needed
 dvytr run
@@ -407,7 +407,7 @@ pass insert databases/myapp/postgres
 # Enter your secret when prompted
 
 # Reference it in .env
-echo "DATABASE_PASSWORD=pass:databases/myapp/postgres" >> .env
+echo "DATABASE_PASSWORD=pass://databases/myapp/postgres" >> .env
 
 # Start container - you'll be prompted for GPG password if needed
 dvytr run

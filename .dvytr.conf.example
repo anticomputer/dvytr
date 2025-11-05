@@ -26,7 +26,7 @@ SOCAT_FORWARDS=(
 
 # Environment variables
 # Set environment variables inside the container
-# Supports password managers: use "VAR=passage:path" or "VAR=pass:path" syntax
+# Supports password managers: use "VAR=passage://path" or "VAR=pass://path" syntax
 ENV_VARS=(
     # "NODE_ENV=development"
     # "DEBUG=true"
@@ -35,12 +35,12 @@ ENV_VARS=(
     #
     # Password manager secrets (retrieved automatically at container creation)
     # Passage (https://github.com/FiloSottile/passage):
-    # "API_KEY=passage:services/api/production"
-    # "DATABASE_PASSWORD=passage:databases/postgres/main"
+    # "API_KEY=passage://services/api/production"
+    # "DATABASE_PASSWORD=passage://databases/postgres/main"
     #
     # Pass (https://www.passwordstore.org/):
-    # "API_KEY=pass:services/api/production"
-    # "AWS_SECRET_ACCESS_KEY=pass:aws/credentials/secret"
+    # "API_KEY=pass://services/api/production"
+    # "AWS_SECRET_ACCESS_KEY=pass://aws/credentials/secret"
 )
 
 # Additional volume mounts
@@ -154,11 +154,11 @@ INIT_SCRIPT=""
 # ENV_VARS=(
 #     "NODE_ENV=production"
 #     # Using passage (age-based encryption):
-#     "API_KEY=passage:services/myapp/api-key"           # Retrieved from passage
-#     "DATABASE_URL=passage:databases/myapp/connection"  # Retrieved from passage
+#     "API_KEY=passage://services/myapp/api-key"           # Retrieved from passage
+#     "DATABASE_URL=passage://databases/myapp/connection"  # Retrieved from passage
 #     # Using pass (GPG-based encryption):
-#     "JWT_SECRET=pass:secrets/myapp/jwt"                # Retrieved from pass
-#     "AWS_SECRET=pass:aws/credentials/secret"           # Retrieved from pass
+#     "JWT_SECRET=pass://secrets/myapp/jwt"                # Retrieved from pass
+#     "AWS_SECRET=pass://aws/credentials/secret"           # Retrieved from pass
 #     # Regular env var:
 #     "DEBUG=false"
 # )

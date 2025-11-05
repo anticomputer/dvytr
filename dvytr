@@ -89,12 +89,12 @@ load_env_file() {
 }
 
 # Resolve passage password manager secrets
-# Processes ENV_VARS array and replaces "passage:path" with actual secrets
+# Processes ENV_VARS array and replaces "passage://path" with actual secrets
 resolve_passage_secrets() {
-    # First check if any passage: references exist
+    # First check if any passage:// references exist
     local has_passage_refs=false
     for env in "${ENV_VARS[@]}"; do
-        if [[ "$env" =~ passage: ]]; then
+        if [[ "$env" =~ passage:// ]]; then
             has_passage_refs=true
             break
         fi
@@ -107,16 +107,16 @@ resolve_passage_secrets() {
 
     # Check if passage is available
     if ! command -v passage >/dev/null 2>&1; then
-        print_error "passage command not found but passage: reference detected in configuration"
+        print_error "passage command not found but passage:// reference detected in configuration"
         print_info "Install passage from: https://github.com/FiloSottile/passage"
         exit 1
     fi
 
-    # Process each ENV_VAR for passage: references
+    # Process each ENV_VAR for passage:// references
     local resolved_vars=()
     for env in "${ENV_VARS[@]}"; do
-        # Match pattern: VAR_NAME=passage:path/to/secret
-        if [[ "$env" =~ ^([^=]+)=passage:(.+)$ ]]; then
+        # Match pattern: VAR_NAME=passage://path/to/secret
+        if [[ "$env" =~ ^([^=]+)=passage://(.+)$ ]]; then
             local var_name="${BASH_REMATCH[1]}"
             local passage_path="${BASH_REMATCH[2]}"
 
@@ -151,12 +151,12 @@ resolve_passage_secrets() {
 }
 
 # Resolve pass (password-store) secrets
-# Processes ENV_VARS array and replaces "pass:path" with actual secrets
+# Processes ENV_VARS array and replaces "pass://path" with actual secrets
 resolve_pass_secrets() {
-    # First check if any pass: references exist
+    # First check if any pass:// references exist
     local has_pass_refs=false
     for env in "${ENV_VARS[@]}"; do
-        if [[ "$env" =~ pass: ]]; then
+        if [[ "$env" =~ pass:// ]]; then
             has_pass_refs=true
             break
         fi
@@ -169,16 +169,16 @@ resolve_pass_secrets() {
 
     # Check if pass is available
     if ! command -v pass >/dev/null 2>&1; then
-        print_error "pass command not found but pass: reference detected in configuration"
+        print_error "pass command not found but pass:// reference detected in configuration"
         print_info "Install pass from: https://www.passwordstore.org/"
         exit 1
     fi
 
-    # Process each ENV_VAR for pass: references
+    # Process each ENV_VAR for pass:// references
     local resolved_vars=()
     for env in "${ENV_VARS[@]}"; do
-        # Match pattern: VAR_NAME=pass:path/to/secret
-        if [[ "$env" =~ ^([^=]+)=pass:(.+)$ ]]; then
+        # Match pattern: VAR_NAME=pass://path/to/secret
+        if [[ "$env" =~ ^([^=]+)=pass://(.+)$ ]]; then
             local var_name="${BASH_REMATCH[1]}"
             local pass_path="${BASH_REMATCH[2]}"
 
@@ -525,15 +525,15 @@ ENVIRONMENT VARIABLES:
 
 PASSWORD MANAGERS:
     DevYeeter supports retrieving secrets from password managers.
-    Use 'passage:' or 'pass:' prefix in environment variables:
+    Use 'passage://' or 'pass://' prefix in environment variables:
 
     In .dvytr.conf:
-    ENV_VARS=("API_KEY=passage:services/api/key")
-    ENV_VARS=("API_KEY=pass:services/api/key")
+    ENV_VARS=("API_KEY=passage://services/api/key")
+    ENV_VARS=("API_KEY=pass://services/api/key")
 
     In .env file:
-    API_KEY=passage:services/api/key          # Using passage (age encryption)
-    DATABASE_PASSWORD=pass:databases/postgres # Using pass (GPG encryption)
+    API_KEY=passage://services/api/key          # Using passage (age encryption)
+    DATABASE_PASSWORD=pass://databases/postgres # Using pass (GPG encryption)
 
     Secrets are retrieved when running 'dvytr run' before container creation.
 
