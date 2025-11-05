@@ -151,6 +151,37 @@ ADDITIONAL_VOLUMES=("$HOME/.ssh:/home/dev/.ssh:ro")
 
 See `.dvytr.conf.example` for a complete example.
 
+### Port Forwarding with Socat (Usually Not Needed)
+
+In rare cases, you may encounter a service that binds only to `127.0.0.1` (localhost) inside the container and cannot be configured to bind to `0.0.0.0`. For these situations, DevYeeter supports automatic port forwarding using socat.
+
+**Important: This is rarely needed!** Most modern dev servers (Vite, Next.js, webpack-dev-server, etc.) can be configured to bind to all interfaces using flags or environment variables. Always try that first:
+
+```bash
+# Preferred approach - configure the service directly
+ENV_VARS=("VITE_HOST=0.0.0.0")  # For Vite
+# or use command flags: vite --host 0.0.0.0
+```
+
+If you truly need socat forwarding, add it to `.dvytr.conf`:
+
+```bash
+# Format: "container_port:target_host:target_port"
+SOCAT_FORWARDS=("3001:127.0.0.1:3000")
+DOCKER_PORT_MAPPINGS=("3001:3001")  # Map the forwarding port to host
+```
+
+This forwards requests on `0.0.0.0:3001` inside the container to `127.0.0.1:3000`, allowing you to access the service from your host machine at `localhost:3001`.
+
+**When you might need this:**
+- Legacy applications that hardcode `127.0.0.1` binding
+- Third-party tools without configuration options
+- Services where modifying the bind address is impractical
+
+**When you don't need this:**
+- Any service that accepts a `--host` flag or environment variable (use that instead!)
+- Services you control and can configure
+
 ### Environment Variables from .env
 
 DevYeeter automatically loads environment variables from a `.env` file in your project directory. This follows the common convention used by many development tools.
