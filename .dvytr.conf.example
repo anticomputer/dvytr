@@ -55,23 +55,44 @@ PATH_DIRS=(
     # "/absolute/path"     # Absolute paths are also supported
 )
 
-# Initialization script
-# Path to a bash script that runs once on first container start
+# Initialization script (choose one method)
+#
+# Method 1: RUN_INIT - Embedded script content (recommended, self-contained)
+# Bash script that runs once on first container start
 # Useful for building dependencies or setting up the workspace
 # The script runs as the dev user after UID/GID mapping
 # A marker file at .dvytr/.initialized prevents re-running
-INIT_SCRIPT=""
-# INIT_SCRIPT=".dvytr/init.sh"
-
-# Example init script that builds a Go binary:
+#
+# RECOMMENDED: Use heredoc syntax for easy copy-paste without escaping issues
+RUN_INIT=''
+# Example: Build a Go binary from a private repo
+# RUN_INIT=$(cat <<'EOF'
 # #!/bin/bash
 # set -e
-# echo "Building project dependencies..."
-# mkdir -p .dvytr/dependencies/bin
-# GOBIN="$(pwd)/.dvytr/dependencies/bin" go install github.com/example/tool@latest
-# echo "Dependencies installed to .dvytr/dependencies/bin"
+# echo "=== Building project dependencies ==="
 #
+# # Configure SSH for GitHub (if using private repos)
+# mkdir -p ~/.ssh-local && chmod 700 ~/.ssh-local
+# ssh-keyscan -H github.com >> ~/.ssh-local/known_hosts 2>/dev/null
+# export GIT_SSH_COMMAND="ssh -o UserKnownHostsFile=$HOME/.ssh-local/known_hosts -o StrictHostKeyChecking=accept-new"
+#
+# # Build dependencies
+# mkdir -p .dvytr/dependencies/bin
+# export GOBIN="$(pwd)/.dvytr/dependencies/bin"
+# GOPRIVATE=github.com/myorg go install -v github.com/myorg/tool@latest
+#
+# echo "=== Dependencies ready in .dvytr/dependencies/bin/ ==="
+# EOF
+# )
 # Then add to PATH_DIRS: ".dvytr/dependencies/bin"
+#
+# NOTE: The <<'EOF' syntax (quoted delimiter) prevents variable expansion
+# and allows you to use single quotes freely inside the script without escaping
+#
+# Method 2: INIT_SCRIPT - External script file (for complex setups)
+# Path to a bash script relative to workspace
+INIT_SCRIPT=""
+# INIT_SCRIPT=".dvytr/init.sh"
 
 # Note: The current working directory is automatically mounted to /workspace
 # All configuration values are optional

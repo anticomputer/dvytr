@@ -186,17 +186,11 @@ my-custom-script.sh  # Runs /workspace/bin/my-custom-script.sh
 
 ### Initialization Scripts
 
-For projects that need to build dependencies or perform one-time setup, you can specify an initialization script that runs once on first container start. This is particularly useful for:
+For projects that need to build dependencies or perform one-time setup, you can specify initialization that runs once on first container start. This is particularly useful for:
 
 - Building platform-specific binaries (e.g., Go tools, Rust programs)
 - Installing project-specific tools
 - Setting up local caches or databases
-
-```bash
-# .dvytr.conf
-INIT_SCRIPT=".dvytr/init.sh"
-PATH_DIRS=(".dvytr/dependencies/bin")
-```
 
 The init script:
 - Runs once on first container start (tracked by `.dvytr/.initialized` marker)
@@ -204,35 +198,55 @@ The init script:
 - Has access to all project files and installed tools
 - Can install to `.dvytr/dependencies/` which persists across container restarts
 
-**Example: Building a Go tool**
+**Method 1: RUN_INIT (Recommended) - Embedded script**
 
-Create `.dvytr/init.sh`:
+Keep everything self-contained in `.dvytr.conf` using `RUN_INIT`. Use heredoc syntax for easy copy-paste without escaping issues:
+
 ```bash
+# .dvytr.conf
+RUN_INIT=$(cat <<'EOF'
 #!/bin/bash
 set -e
-
 echo "Building project dependencies..."
 
 # Create dependencies directory
 mkdir -p .dvytr/dependencies/bin
 
-# Build Go binary into dependencies directory
+# Build Go binary
 GOBIN="$(pwd)/.dvytr/dependencies/bin" \
   go install github.com/example/tool@latest
 
-echo "Dependencies ready in .dvytr/dependencies/bin"
+echo "Dependencies ready!"
+EOF
+)
+
+PATH_DIRS=(".dvytr/dependencies/bin")
 ```
 
-Make it executable and configure:
-```bash
-chmod +x .dvytr/init.sh
+The `<<'EOF'` syntax (quoted delimiter) prevents variable expansion and allows you to use single quotes, double quotes, or any special characters freely inside the script without escaping. Just copy-paste your script between the heredoc markers!
 
+Now `tool` will be available in PATH on first and subsequent container starts. No external files needed!
+
+**Method 2: INIT_SCRIPT - External script file**
+
+For complex setups, use an external script file:
+
+```bash
 # .dvytr.conf
 INIT_SCRIPT=".dvytr/init.sh"
 PATH_DIRS=(".dvytr/dependencies/bin")
 ```
 
-Now `tool` will be available in PATH on first and subsequent container starts.
+Create `.dvytr/init.sh`:
+```bash
+#!/bin/bash
+set -e
+echo "Building project dependencies..."
+mkdir -p .dvytr/dependencies/bin
+GOBIN="$(pwd)/.dvytr/dependencies/bin" go install github.com/example/tool@latest
+```
+
+Make it executable: `chmod +x .dvytr/init.sh`
 
 **Re-running initialization:**
 If you need to re-run the init script, simply remove the marker file:

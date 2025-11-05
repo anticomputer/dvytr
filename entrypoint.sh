@@ -113,16 +113,34 @@ fi
 DVYTR_DIR="/workspace/.dvytr"
 INIT_MARKER="$DVYTR_DIR/.initialized"
 
-if [ -n "$DVYTR_INIT_SCRIPT" ] && [ ! -f "$INIT_MARKER" ]; then
-    INIT_SCRIPT_PATH="/workspace/$DVYTR_INIT_SCRIPT"
+# Check if we need to run initialization (RUN_INIT takes precedence over INIT_SCRIPT)
+if ([ -n "$DVYTR_RUN_INIT" ] || [ -n "$DVYTR_INIT_SCRIPT" ]) && [ ! -f "$INIT_MARKER" ]; then
+    # Create .dvytr directory if it doesn't exist
+    mkdir -p "$DVYTR_DIR"
+    chown "$WORKSPACE_UID:$WORKSPACE_GID" "$DVYTR_DIR" 2>/dev/null || chown dev:dev "$DVYTR_DIR"
 
-    if [ -f "$INIT_SCRIPT_PATH" ]; then
+    # Determine script source
+    if [ -n "$DVYTR_RUN_INIT" ]; then
+        # Embedded script content
+        echo "[dvytr] Running embedded initialization script"
+        INIT_SCRIPT_PATH="/tmp/dvytr-run-init-$$.sh"
+
+        # Write embedded content to temporary file
+        printf '%s\n' "$DVYTR_RUN_INIT" > "$INIT_SCRIPT_PATH"
+        chmod +x "$INIT_SCRIPT_PATH"
+    else
+        # External script file
         echo "[dvytr] Running initialization script: $DVYTR_INIT_SCRIPT"
+        INIT_SCRIPT_PATH="/workspace/$DVYTR_INIT_SCRIPT"
 
-        # Create .dvytr directory if it doesn't exist
-        mkdir -p "$DVYTR_DIR"
-        chown "$WORKSPACE_UID:$WORKSPACE_GID" "$DVYTR_DIR" 2>/dev/null || chown dev:dev "$DVYTR_DIR"
+        if [ ! -f "$INIT_SCRIPT_PATH" ]; then
+            echo "[dvytr] WARNING: Init script not found: $INIT_SCRIPT_PATH"
+            INIT_SCRIPT_PATH=""
+        fi
+    fi
 
+    # Execute the script if we have a valid path
+    if [ -n "$INIT_SCRIPT_PATH" ]; then
         # Run the init script as dev user
         if gosu dev bash "$INIT_SCRIPT_PATH"; then
             # Create marker file on success
@@ -132,8 +150,11 @@ if [ -n "$DVYTR_INIT_SCRIPT" ] && [ ! -f "$INIT_MARKER" ]; then
             echo "[dvytr] WARNING: Initialization script failed (exit code: $?)"
             echo "[dvytr] Container will continue, but dependencies may be missing"
         fi
-    else
-        echo "[dvytr] WARNING: Init script not found: $INIT_SCRIPT_PATH"
+
+        # Clean up temporary file if using RUN_INIT
+        if [ -n "$DVYTR_RUN_INIT" ]; then
+            rm -f "$INIT_SCRIPT_PATH"
+        fi
     fi
 fi
 

@@ -49,6 +49,7 @@ ADDITIONAL_VOLUMES=()
 SOCAT_FORWARDS=()  # Format: "container_listen_port:target_host:target_port"
 PATH_DIRS=()  # Directories relative to /workspace to add to PATH
 INIT_SCRIPT=""  # Path to initialization script (relative to workspace)
+RUN_INIT=""  # Embedded initialization script content
 
 # Load configuration from file if it exists
 load_config() {
@@ -204,6 +205,11 @@ cmd_run() {
     # Add init script path if configured
     if [[ -n "$INIT_SCRIPT" ]]; then
         docker_args+=("-e" "DVYTR_INIT_SCRIPT=$INIT_SCRIPT")
+    fi
+
+    # Add embedded init script content if configured (takes precedence over INIT_SCRIPT)
+    if [[ -n "$RUN_INIT" ]]; then
+        docker_args+=("-e" "DVYTR_RUN_INIT=$RUN_INIT")
     fi
 
     # Add additional volumes
