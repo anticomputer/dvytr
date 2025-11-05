@@ -67,5 +67,40 @@ while true; do
     i=$((i + 1))
 done
 
+# Add custom PATH directories if configured
+# Expected format: PATH_DIR_0="bin" PATH_DIR_1="scripts" etc.
+CUSTOM_PATH=""
+i=0
+while true; do
+    var_name="PATH_DIR_$i"
+    path_dir="${!var_name}"
+
+    if [ -z "$path_dir" ]; then
+        break
+    fi
+
+    # Convert relative path to absolute (relative to /workspace)
+    if [[ "$path_dir" != /* ]]; then
+        path_dir="/workspace/$path_dir"
+    fi
+
+    if [ -n "$CUSTOM_PATH" ]; then
+        CUSTOM_PATH="$path_dir:$CUSTOM_PATH"
+    else
+        CUSTOM_PATH="$path_dir"
+    fi
+
+    echo "[dvytr] Adding to PATH: $path_dir"
+    i=$((i + 1))
+done
+
+# Prepend custom paths to PATH if any were configured
+# Write to /etc/profile.d/ so it persists for all bash sessions (including docker exec)
+if [ -n "$CUSTOM_PATH" ]; then
+    echo "export PATH=\"$CUSTOM_PATH:\$PATH\"" > /etc/profile.d/dvytr-path.sh
+    chmod +x /etc/profile.d/dvytr-path.sh
+    export PATH="$CUSTOM_PATH:$PATH"
+fi
+
 # Execute the command as the dev user
 exec gosu dev "$@"

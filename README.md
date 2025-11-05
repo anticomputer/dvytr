@@ -147,9 +147,42 @@ ENV_VARS=("NODE_ENV=development" "DEBUG=true")
 
 # Additional volume mounts
 ADDITIONAL_VOLUMES=("$HOME/.ssh:/home/dev/.ssh:ro")
+
+# Add project directories to PATH
+PATH_DIRS=("bin" "scripts")
 ```
 
 See `.dvytr.conf.example` for a complete example.
+
+### Adding Directories to PATH
+
+You can add project-specific directories to the container's PATH, making scripts and binaries in those directories directly executable. This is useful for projects with custom tooling in subdirectories.
+
+```bash
+# .dvytr.conf
+PATH_DIRS=("bin" "scripts" "node_modules/.bin")
+```
+
+Paths are relative to `/workspace` (your project root) by default, but absolute paths are also supported. The directories are prepended to PATH, so they take precedence over system binaries.
+
+**Common use cases:**
+- `"bin"` - Project-specific scripts and executables
+- `"scripts"` - Build or deployment scripts
+- `"node_modules/.bin"` - Node.js package binaries (though most package managers handle this automatically)
+- `"tools"` - Custom development tools
+
+**Example:**
+```bash
+# .dvytr.conf
+PATH_DIRS=("bin")
+```
+
+With this configuration, you can run scripts directly:
+```bash
+dvytr shell
+# Inside container
+my-custom-script.sh  # Runs /workspace/bin/my-custom-script.sh
+```
 
 ### Port Forwarding with Socat (Usually Not Needed)
 

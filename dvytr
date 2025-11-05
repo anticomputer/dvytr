@@ -47,6 +47,7 @@ DOCKER_PORT_MAPPINGS=()  # Format: "host_port:container_port"
 ENV_VARS=()
 ADDITIONAL_VOLUMES=()
 SOCAT_FORWARDS=()  # Format: "container_listen_port:target_host:target_port"
+PATH_DIRS=()  # Directories relative to /workspace to add to PATH
 
 # Load configuration from file if it exists
 load_config() {
@@ -192,6 +193,13 @@ cmd_run() {
         i=$((i + 1))
     done
 
+    # Add PATH directories as environment variables
+    local j=0
+    for path_dir in "${PATH_DIRS[@]}"; do
+        docker_args+=("-e" "PATH_DIR_$j=$path_dir")
+        j=$((j + 1))
+    done
+
     # Add additional volumes
     for volume in "${ADDITIONAL_VOLUMES[@]}"; do
         docker_args+=("-v" "$volume")
@@ -224,7 +232,7 @@ cmd_shell() {
     fi
 
     print_info "Attaching to container '${CONTAINER_NAME}'..."
-    docker exec -it --user dev "$CONTAINER_NAME" /bin/bash
+    docker exec -it --user dev "$CONTAINER_NAME" /bin/bash --login
 }
 
 # Execute command in container
@@ -249,7 +257,13 @@ cmd_exec() {
         docker start "$CONTAINER_NAME"
     fi
 
-    docker exec -it --user dev "$CONTAINER_NAME" "$@"
+    # Use -it flags only if stdin is a TTY
+    local tty_flags=""
+    if [[ -t 0 ]]; then
+        tty_flags="-it"
+    fi
+
+    docker exec $tty_flags --user dev "$CONTAINER_NAME" bash --login -c "$*"
 }
 
 # Stop the container

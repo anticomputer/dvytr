@@ -44,6 +44,16 @@ ADDITIONAL_VOLUMES=(
     # "/var/run/docker.sock:/var/run/docker.sock"  # Docker socket for docker/docker-compose commands
 )
 
+# Additional PATH directories
+# Add project directories to PATH (relative to /workspace)
+# Useful for projects with custom scripts or binaries in subdirectories
+PATH_DIRS=(
+    # "bin"           # Adds /workspace/bin to PATH
+    # "scripts"       # Adds /workspace/scripts to PATH
+    # "node_modules/.bin"  # Adds /workspace/node_modules/.bin to PATH
+    # "/absolute/path"     # Absolute paths are also supported
+)
+
 # Note: The current working directory is automatically mounted to /workspace
 # All configuration values are optional
 
