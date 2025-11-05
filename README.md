@@ -10,6 +10,7 @@ A bash-based tool for spinning up fully-featured development Docker containers w
 - **Automatic Mounting**: Current directory auto-mounted to `/workspace`
 - **Dedicated User**: Non-root `dev` user with sudo access for better security
 - **Configurable**: Port forwarding, environment variables, and volume mounts
+- **Password Manager Integration**: Native support for passage and pass password managers with `passage:` and `pass:` syntax
 - **Easy Management**: Simple commands for start, stop, shell access, and cleanup
 
 ## Prerequisites
@@ -310,6 +311,120 @@ These variables will be automatically injected into the container environment wh
 - Quotes are preserved as part of the value
 - Changes to `.env` require restarting the container: `dvytr stop && dvytr run`
 - The `.env` file is git-ignored by default to protect secrets
+
+### Password Manager Integration
+
+DevYeeter integrates with popular Unix password managers, allowing you to securely store secrets and reference them in your configuration without committing sensitive data to your repository.
+
+**Supported Password Managers:**
+
+- **[passage](https://github.com/FiloSottile/passage)**: Modern password manager using age encryption (faster, simpler)
+- **[pass](https://www.passwordstore.org/)**: Standard Unix password manager using GPG encryption (widely adopted)
+
+**Prerequisites for passage:**
+1. Install passage: https://github.com/FiloSottile/passage
+2. Initialize your passage store: `passage init <age-public-key>`
+3. Add secrets to passage: `passage insert services/myapp/api-key`
+
+**Prerequisites for pass:**
+1. Install pass: https://www.passwordstore.org/
+2. Initialize your pass store: `pass init <gpg-key-id>`
+3. Add secrets to pass: `pass insert services/myapp/api-key`
+
+**Usage:**
+
+Use the `passage:` or `pass:` prefix in environment variables to automatically retrieve secrets:
+
+```bash
+# .dvytr.conf
+ENV_VARS=(
+    "NODE_ENV=production"
+    # Using passage:
+    "API_KEY=passage:services/myapp/api-key"
+    "DATABASE_PASSWORD=passage:databases/postgres/main"
+    # Using pass:
+    "JWT_SECRET=pass:secrets/myapp/jwt"
+    "AWS_SECRET_ACCESS_KEY=pass:aws/credentials/secret"
+)
+```
+
+Or in your `.env` file:
+
+```bash
+# .env
+NODE_ENV=development
+# Using passage (age encryption):
+API_KEY=passage:services/myapp/api-key
+DATABASE_PASSWORD=passage:databases/postgres/main
+# Using pass (GPG encryption):
+JWT_SECRET=pass:secrets/myapp/jwt
+AWS_SECRET_ACCESS_KEY=pass:aws/credentials/secret
+```
+
+**How it works:**
+
+1. When you run `dvytr run`, DevYeeter detects any `passage:` or `pass:` prefixed values
+2. For each one, it runs `passage show <path>` or `pass show <path>` to retrieve the secret
+3. The secret replaces the reference before the container is created
+4. Secrets are passed securely to the container as environment variables
+
+**Security notes:**
+
+- Secrets are retrieved at container creation time (not stored in config files)
+- If your password manager requires a password, you'll be prompted when running `dvytr run`
+- You can optionally mount your password stores read-only into the container:
+  ```bash
+  ADDITIONAL_VOLUMES=(
+      "$HOME/.passage:/home/dev/.passage:ro"              # For passage
+      "$HOME/.password-store:/home/dev/.password-store:ro" # For pass
+  )
+  ```
+- For multi-line secrets, only the first line is used (following password-store conventions)
+
+**Example workflow with passage:**
+
+```bash
+# Store your API key in passage
+passage insert services/myapp/production-api
+# Enter your secret when prompted
+
+# Reference it in .dvytr.conf
+echo 'ENV_VARS=("API_KEY=passage:services/myapp/production-api")' > .dvytr.conf
+
+# Start container - you'll be prompted for passage password if needed
+dvytr run
+
+# Inside container, the secret is available
+dvytr shell
+echo $API_KEY  # Shows the actual secret value
+```
+
+**Example workflow with pass:**
+
+```bash
+# Store your database password in pass
+pass insert databases/myapp/postgres
+# Enter your secret when prompted
+
+# Reference it in .env
+echo "DATABASE_PASSWORD=pass:databases/myapp/postgres" >> .env
+
+# Start container - you'll be prompted for GPG password if needed
+dvytr run
+
+# Inside container, the secret is available
+dvytr shell
+echo $DATABASE_PASSWORD  # Shows the actual secret value
+```
+
+**Benefits:**
+
+- Keep secrets out of version control
+- Centralized secret management across all projects
+- Choose your preferred encryption: age (passage) or GPG (pass)
+- Works seamlessly with existing password manager workflows
+- No need to manually copy-paste secrets into config files
+- Mix and match both password managers in the same project
 
 ## Installed Tools
 

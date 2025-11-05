@@ -26,11 +26,21 @@ SOCAT_FORWARDS=(
 
 # Environment variables
 # Set environment variables inside the container
+# Supports password managers: use "VAR=passage:path" or "VAR=pass:path" syntax
 ENV_VARS=(
     # "NODE_ENV=development"
     # "DEBUG=true"
     # "API_KEY=your-api-key"
     # "DATABASE_URL=postgres://localhost/mydb"
+    #
+    # Password manager secrets (retrieved automatically at container creation)
+    # Passage (https://github.com/FiloSottile/passage):
+    # "API_KEY=passage:services/api/production"
+    # "DATABASE_PASSWORD=passage:databases/postgres/main"
+    #
+    # Pass (https://www.passwordstore.org/):
+    # "API_KEY=pass:services/api/production"
+    # "AWS_SECRET_ACCESS_KEY=pass:aws/credentials/secret"
 )
 
 # Additional volume mounts
@@ -137,3 +147,34 @@ INIT_SCRIPT=""
 # 2. If you can't configure the service at all:
 #    DOCKER_PORT_MAPPINGS=("5173:5174")
 #    SOCAT_FORWARDS=("5174:127.0.0.1:5173")
+
+# Example: Using password managers for secrets
+# CONTAINER_NAME="secure-app"
+# DOCKER_PORT_MAPPINGS=("3000:3000")
+# ENV_VARS=(
+#     "NODE_ENV=production"
+#     # Using passage (age-based encryption):
+#     "API_KEY=passage:services/myapp/api-key"           # Retrieved from passage
+#     "DATABASE_URL=passage:databases/myapp/connection"  # Retrieved from passage
+#     # Using pass (GPG-based encryption):
+#     "JWT_SECRET=pass:secrets/myapp/jwt"                # Retrieved from pass
+#     "AWS_SECRET=pass:aws/credentials/secret"           # Retrieved from pass
+#     # Regular env var:
+#     "DEBUG=false"
+# )
+# ADDITIONAL_VOLUMES=(
+#     "$HOME/.passage:/home/dev/.passage:ro"   # Mount passage store (read-only)
+#     "$HOME/.password-store:/home/dev/.password-store:ro"  # Mount pass store (read-only)
+# )
+#
+# Prerequisites for passage:
+# 1. Install passage: https://github.com/FiloSottile/passage
+# 2. Initialize passage store: passage init <age-public-key>
+# 3. Add secrets: passage insert services/myapp/api-key
+#
+# Prerequisites for pass:
+# 1. Install pass: https://www.passwordstore.org/
+# 2. Initialize pass store: pass init <gpg-key-id>
+# 3. Add secrets: pass insert secrets/myapp/jwt
+#
+# Secrets are retrieved when running 'dvytr run' before container creation
