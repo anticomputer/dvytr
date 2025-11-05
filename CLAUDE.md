@@ -21,7 +21,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 2. **Dockerfile**
    - Ubuntu 22.04 base with multi-language tooling
    - Creates a `dev` user (UID 1000) with sudo access
-   - Pre-installs: C/C++, Python3, Node.js v20, pnpm, Go 1.21.5, Rust, editors (vim/emacs/nano)
+   - Pre-installs: C/C++, Python3, Node.js v22, pnpm, Go 1.21.5, Rust, editors (vim/emacs/nano)
+   - Additional tools: AWS CLI v2, Docker CLI, PostgreSQL client
    - Uses gosu for secure user switching
 
 3. **entrypoint.sh**
@@ -29,6 +30,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
    - Detects mounted `/workspace` owner and modifies `dev` user to match
    - Ensures files created in container are owned by host user
    - Critical for Linux permission handling; transparent on macOS
+   - Handles socat port forwards, custom PATH directories, and initialization scripts
 
 ### Key Design Patterns
 
@@ -41,7 +43,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Configuration Hierarchy**
 1. `.dvytr.conf` in project directory (sourced if exists)
-   - Sets: `CONTAINER_NAME`, `PORTS[]`, `ENV_VARS[]`, `ADDITIONAL_VOLUMES[]`
+   - Sets: `CONTAINER_NAME`, `DOCKER_PORT_MAPPINGS[]`, `ENV_VARS[]`, `ADDITIONAL_VOLUMES[]`
+   - Optional: `SOCAT_FORWARDS[]`, `PATH_DIRS[]`, `INIT_SCRIPT`, `RUN_INIT`
 2. `.env` file auto-loaded (parsed, not sourced)
    - Variables added to `ENV_VARS[]` array
    - Format: `KEY=value` (comments and empty lines ignored)
@@ -52,6 +55,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Modifies `dev` user to match host user
 - Drops to `dev` user via `gosu`
 - All tools in `/home/dev` remain accessible after UID change
+
+**Advanced Features**
+- **Socat Port Forwarding**: Forward traffic from 0.0.0.0 to localhost-only services
+  - Configured via `SOCAT_FORWARDS[]` array
+  - Format: `"listen_port:target_host:target_port"`
+- **Custom PATH Directories**: Add project directories to PATH
+  - Configured via `PATH_DIRS[]` array
+  - Paths relative to `/workspace` or absolute
+  - Written to `/etc/profile.d/dvytr-path.sh` for persistence
+- **Initialization Scripts**: Run once on first container start
+  - `RUN_INIT`: Embedded script content (heredoc recommended)
+  - `INIT_SCRIPT`: Path to external script file
+  - Tracked by `.dvytr/.initialized` marker file
+  - Runs as `dev` user after UID/GID mapping
 
 ## Common Commands
 
@@ -92,24 +109,40 @@ cd ~/projects/tmp && /path/to/dvytr run  # Different hash!
 
 ## Implementation Notes
 
-### Container Name Generation (dvytr:82-102)
+### Container Name Generation (dvytr:92-112)
 - Sanitizes basename: `tr '[:upper:]' '[:lower:]' | tr -cd '[:alnum:]-'`
 - Generates MD5 hash of full path (8 chars)
 - Cross-platform: uses `md5sum` (Linux) or `md5` (macOS), falls back to `cksum`
 
-### Config Loading (dvytr:44-79)
+### Config Loading (dvytr:54-89)
 - `load_config()`: Sources `.dvytr.conf` if exists
 - `load_env_file()`: Parses `.env` line-by-line, validates format
   - Regex: `^[A-Za-z_][A-Za-z0-9_]*=`
   - Adds validated lines to `ENV_VARS[]` array
 
-### Docker Run Flow (dvytr:117-177)
+### Docker Run Flow (dvytr:143-228)
 1. Load config and .env
 2. Generate container name (or use custom)
 3. Check if image exists (build if not)
 4. Check if container exists (start if exists, create if not)
-5. Build docker args array (ports, env vars, volumes)
+5. Build docker args array:
+   - Port mappings from `DOCKER_PORT_MAPPINGS[]`
+   - Environment variables from `ENV_VARS[]`
+   - Socat forwards as `SOCAT_FORWARD_N` env vars
+   - PATH directories as `PATH_DIR_N` env vars
+   - Init script config as `DVYTR_INIT_SCRIPT` or `DVYTR_RUN_INIT`
+   - Additional volumes from `ADDITIONAL_VOLUMES[]`
 6. Execute `docker run -itd` with constructed args
+
+### Entrypoint Flow (entrypoint.sh:1-163)
+1. Detect workspace UID/GID and adjust `dev` user to match
+2. Start socat port forwards if `SOCAT_FORWARD_N` env vars present
+3. Build custom PATH from `PATH_DIR_N` env vars and write to `/etc/profile.d/dvytr-path.sh`
+4. Run initialization script if configured and not already run:
+   - Check for `.dvytr/.initialized` marker
+   - Execute `RUN_INIT` (embedded) or `INIT_SCRIPT` (external file)
+   - Create marker on success
+5. Drop to `dev` user and exec command
 
 ## Naming Conventions
 
