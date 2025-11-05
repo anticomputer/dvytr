@@ -184,6 +184,64 @@ dvytr shell
 my-custom-script.sh  # Runs /workspace/bin/my-custom-script.sh
 ```
 
+### Initialization Scripts
+
+For projects that need to build dependencies or perform one-time setup, you can specify an initialization script that runs once on first container start. This is particularly useful for:
+
+- Building platform-specific binaries (e.g., Go tools, Rust programs)
+- Installing project-specific tools
+- Setting up local caches or databases
+
+```bash
+# .dvytr.conf
+INIT_SCRIPT=".dvytr/init.sh"
+PATH_DIRS=(".dvytr/dependencies/bin")
+```
+
+The init script:
+- Runs once on first container start (tracked by `.dvytr/.initialized` marker)
+- Executes as the `dev` user after UID/GID mapping
+- Has access to all project files and installed tools
+- Can install to `.dvytr/dependencies/` which persists across container restarts
+
+**Example: Building a Go tool**
+
+Create `.dvytr/init.sh`:
+```bash
+#!/bin/bash
+set -e
+
+echo "Building project dependencies..."
+
+# Create dependencies directory
+mkdir -p .dvytr/dependencies/bin
+
+# Build Go binary into dependencies directory
+GOBIN="$(pwd)/.dvytr/dependencies/bin" \
+  go install github.com/example/tool@latest
+
+echo "Dependencies ready in .dvytr/dependencies/bin"
+```
+
+Make it executable and configure:
+```bash
+chmod +x .dvytr/init.sh
+
+# .dvytr.conf
+INIT_SCRIPT=".dvytr/init.sh"
+PATH_DIRS=(".dvytr/dependencies/bin")
+```
+
+Now `tool` will be available in PATH on first and subsequent container starts.
+
+**Re-running initialization:**
+If you need to re-run the init script, simply remove the marker file:
+```bash
+rm .dvytr/.initialized
+dvytr stop
+dvytr run
+```
+
 ### Port Forwarding with Socat (Usually Not Needed)
 
 In rare cases, you may encounter a service that binds only to `127.0.0.1` (localhost) inside the container and cannot be configured to bind to `0.0.0.0`. For these situations, DevYeeter supports automatic port forwarding using socat.

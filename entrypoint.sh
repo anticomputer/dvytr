@@ -102,5 +102,40 @@ if [ -n "$CUSTOM_PATH" ]; then
     export PATH="$CUSTOM_PATH:$PATH"
 fi
 
+# Fix SSH agent socket permissions if it exists
+# The socket is mounted from host but needs to be accessible by dev user
+if [ -n "$SSH_AUTH_SOCK" ] && [ -S "$SSH_AUTH_SOCK" ]; then
+    echo "[dvytr] Adjusting SSH agent socket permissions"
+    chmod 666 "$SSH_AUTH_SOCK"
+fi
+
+# Run initialization script if configured and not already initialized
+DVYTR_DIR="/workspace/.dvytr"
+INIT_MARKER="$DVYTR_DIR/.initialized"
+
+if [ -n "$DVYTR_INIT_SCRIPT" ] && [ ! -f "$INIT_MARKER" ]; then
+    INIT_SCRIPT_PATH="/workspace/$DVYTR_INIT_SCRIPT"
+
+    if [ -f "$INIT_SCRIPT_PATH" ]; then
+        echo "[dvytr] Running initialization script: $DVYTR_INIT_SCRIPT"
+
+        # Create .dvytr directory if it doesn't exist
+        mkdir -p "$DVYTR_DIR"
+        chown "$WORKSPACE_UID:$WORKSPACE_GID" "$DVYTR_DIR" 2>/dev/null || chown dev:dev "$DVYTR_DIR"
+
+        # Run the init script as dev user
+        if gosu dev bash "$INIT_SCRIPT_PATH"; then
+            # Create marker file on success
+            gosu dev touch "$INIT_MARKER"
+            echo "[dvytr] Initialization complete"
+        else
+            echo "[dvytr] WARNING: Initialization script failed (exit code: $?)"
+            echo "[dvytr] Container will continue, but dependencies may be missing"
+        fi
+    else
+        echo "[dvytr] WARNING: Init script not found: $INIT_SCRIPT_PATH"
+    fi
+fi
+
 # Execute the command as the dev user
 exec gosu dev "$@"

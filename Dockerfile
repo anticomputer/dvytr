@@ -90,9 +90,15 @@ RUN apt-get update && apt-get install -y \
     postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Go
+# Install Go (architecture-aware)
 ENV GO_VERSION=1.21.5
-RUN curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" | tar -C /usr/local -xzf - && \
+RUN ARCH=$(uname -m) && \
+    if [ "$ARCH" = "aarch64" ]; then \
+        GO_ARCH="arm64"; \
+    else \
+        GO_ARCH="amd64"; \
+    fi && \
+    curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-${GO_ARCH}.tar.gz" | tar -C /usr/local -xzf - && \
     ln -s /usr/local/go/bin/go /usr/local/bin/go && \
     ln -s /usr/local/go/bin/gofmt /usr/local/bin/gofmt
 
