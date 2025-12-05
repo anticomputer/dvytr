@@ -1,5 +1,5 @@
 # DevYeeter: Multi-language Development Environment
-FROM ubuntu:22.04
+FROM ubuntu:24.04
 
 # Prevent interactive prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
@@ -16,7 +16,7 @@ RUN apt-get update && apt-get install -y \
     # Network tools
     curl \
     wget \
-    netcat \
+    netcat-openbsd \
     socat \
     net-tools \
     # Editors
@@ -85,9 +85,28 @@ RUN install -m 0755 -d /etc/apt/keyrings && \
     apt-get install -y docker-ce-cli docker-compose-plugin && \
     rm -rf /var/lib/apt/lists/*
 
-# Install PostgreSQL client tools
+# Install GitHub CLI
+RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | \
+    dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg && \
+    chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg && \
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | \
+    tee /etc/apt/sources.list.d/github-cli.list > /dev/null && \
+    apt-get update && \
+    apt-get install -y gh && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install modern CLI tools
+RUN apt-get update && apt-get install -y \
+    ripgrep \
+    fd-find \
+    tmux \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install database client tools
 RUN apt-get update && apt-get install -y \
     postgresql-client \
+    redis-tools \
+    mysql-client \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Go (architecture-aware)
@@ -105,7 +124,9 @@ RUN ARCH=$(uname -m) && \
 ENV PATH="/usr/local/go/bin:${PATH}"
 
 # Create dev user with sudo access
-RUN useradd -m -s /bin/bash -u 1000 dev && \
+# Ubuntu 24.04 comes with ubuntu user at UID 1000, so remove it first if it exists
+RUN userdel -r ubuntu 2>/dev/null || true && \
+    useradd -m -s /bin/bash -u 1000 dev && \
     echo "dev ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
 # Switch to dev user
@@ -121,6 +142,12 @@ RUN curl -fsSL https://get.pnpm.io/install.sh | bash -
 ENV PNPM_HOME="/home/dev/.local/share/pnpm"
 ENV PATH="${PNPM_HOME}:/home/dev/.local/share/pnpm/global/5/node_modules/.bin:${PATH}"
 
+# Configure pnpm for supply chain security
+# minimum-release-age: Delay package installation by 24 hours (1440 minutes)
+# This gives the community time to identify and remove malicious packages
+RUN echo "minimum-release-age=1440" > /home/dev/.npmrc && \
+    chown dev:dev /home/dev/.npmrc
+
 # Install TypeScript globally via pnpm
 RUN /home/dev/.local/share/pnpm/pnpm add -g typescript ts-node
 
@@ -131,6 +158,13 @@ ENV PATH="${GOPATH}/bin:${PATH}"
 # Install Rust as dev user
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
 ENV PATH="/home/dev/.cargo/bin:${PATH}"
+
+# Install Aikido Safe Chain for real-time malware scanning
+# This provides supply chain protection by intercepting package downloads
+# and checking them against a threat intelligence database
+# Supports both npm/pnpm/yarn (Node.js) and pip/uv (Python) packages
+RUN curl -fsSL https://raw.githubusercontent.com/AikidoSec/safe-chain/main/install-scripts/install-safe-chain.sh | sh -s -- --include-python
+ENV PATH="/home/dev/.safe-chain:${PATH}"
 
 # Create workspace directory with proper permissions
 RUN sudo mkdir -p /workspace && sudo chown dev:dev /workspace

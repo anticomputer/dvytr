@@ -19,17 +19,21 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
    - Key variables: `IMAGE_NAME="dvytr"`, `CONTAINER_PREFIX="dvytr"`, `VERSION="1.0.0"`
 
 2. **Dockerfile**
-   - Ubuntu 22.04 base with multi-language tooling
+   - Ubuntu 24.04 base with multi-language tooling
    - Creates a `dev` user (UID 1000) with sudo access
    - Pre-installs: C/C++, Python3, Node.js v22, pnpm, Go 1.21.5, Rust, editors (vim/emacs/nano)
-   - Additional tools: AWS CLI v2, Docker CLI, PostgreSQL client
+   - Development tools: GitHub CLI (gh), ripgrep, fd-find, tmux
+   - Database clients: PostgreSQL, Redis, MySQL
+   - Cloud tools: AWS CLI v2, Docker CLI + Compose
    - Uses gosu for secure user switching
+   - **Supply chain security**: Configured with two-layer protection (see Security Features section below)
 
 3. **entrypoint.sh**
    - Container entrypoint that dynamically adjusts `dev` user's UID/GID
    - Detects mounted `/workspace` owner and modifies `dev` user to match
    - Ensures files created in container are owned by host user
    - Critical for Linux permission handling; transparent on macOS
+   - Verifies Safe Chain configuration after UID/GID changes (entrypoint.sh:48-67)
    - Handles socat port forwards, custom PATH directories, and initialization scripts
 
 ### Key Design Patterns
@@ -69,6 +73,38 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   - `INIT_SCRIPT`: Path to external script file
   - Tracked by `.dvytr/.initialized` marker file
   - Runs as `dev` user after UID/GID mapping
+
+### Security Features
+
+**Two-Layer Supply Chain Protection**
+
+DevYeeter includes built-in supply chain security to protect against malicious packages:
+
+1. **Time-Based Protection (pnpm minimum-release-age)**
+   - Location: Dockerfile:127-128
+   - Configuration: `minimum-release-age=1440` in `/home/dev/.npmrc`
+   - Prevents installation of packages published within last 24 hours
+   - Gives community time to identify and remove malicious packages
+   - Users can override by mounting custom `~/.npmrc` with exclusions
+
+2. **Real-Time Malware Scanning (Aikido Safe Chain)**
+   - Location: Dockerfile:141-146
+   - Installed via binary installer with `--include-python` flag
+   - Binary location: `/home/dev/.safe-chain`
+   - Supports: npm/pnpm/yarn (Node.js) and pip/pip3/uv (Python)
+   - Works transparently: intercepts package downloads and scans against threat DB
+   - Blocks known malicious packages before installation
+   - Verification: entrypoint.sh:48-67 verifies configuration after UID/GID mapping
+   - No additional configuration required
+
+**How Users Can Customize:**
+- Mount custom `.npmrc` to exclude trusted packages from 24-hour delay
+- Example in `.dvytr.conf.example` shows how to configure exclusions
+- Safe Chain cannot be disabled (critical protection layer)
+
+**Implementation References:**
+- pnpm docs: https://pnpm.io/npmrc#minimum-release-age
+- Safe Chain: https://github.com/AikidoSec/safe-chain
 
 ## Common Commands
 
@@ -134,15 +170,20 @@ cd ~/projects/tmp && /path/to/dvytr run  # Different hash!
    - Additional volumes from `ADDITIONAL_VOLUMES[]`
 6. Execute `docker run -itd` with constructed args
 
-### Entrypoint Flow (entrypoint.sh:1-163)
+### Entrypoint Flow (entrypoint.sh:1-182)
 1. Detect workspace UID/GID and adjust `dev` user to match
-2. Start socat port forwards if `SOCAT_FORWARD_N` env vars present
-3. Build custom PATH from `PATH_DIR_N` env vars and write to `/etc/profile.d/dvytr-path.sh`
-4. Run initialization script if configured and not already run:
+2. Verify Safe Chain configuration after UID/GID changes (entrypoint.sh:48-67):
+   - Check Safe Chain directory and binary exist
+   - Ensure binary is executable
+   - Verify shell aliases are present in .bashrc
+   - Log warnings if misconfigured
+3. Start socat port forwards if `SOCAT_FORWARD_N` env vars present
+4. Build custom PATH from `PATH_DIR_N` env vars and write to `/etc/profile.d/dvytr-path.sh`
+5. Run initialization script if configured and not already run:
    - Check for `.dvytr/.initialized` marker
    - Execute `RUN_INIT` (embedded) or `INIT_SCRIPT` (external file)
    - Create marker on success
-5. Drop to `dev` user and exec command
+6. Drop to `dev` user and exec command
 
 ## Naming Conventions
 

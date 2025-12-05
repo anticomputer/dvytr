@@ -1,6 +1,39 @@
 # DevYeeter Configuration Example
 # Copy this file to .dvytr.conf in your project directory and customize as needed
 
+# ==============================================================================
+# SUPPLY CHAIN SECURITY (Built-in)
+# ==============================================================================
+#
+# DevYeeter includes two layers of supply chain protection:
+#
+# 1. Time-Based Protection (pnpm minimum-release-age)
+#    - Prevents installation of packages published within 24 hours
+#    - Gives community time to identify malicious packages
+#    - Configured globally in container: minimum-release-age=1440 (minutes)
+#
+# 2. Real-Time Malware Scanning (Aikido Safe Chain)
+#    - Scans all npm/pnpm/yarn and pip/pip3/uv packages against threat database
+#    - Blocks known malware before it reaches your container
+#    - Works transparently with all package managers
+#
+# To allow recently-published packages (e.g., internal packages):
+# Mount a custom .npmrc with exclusions:
+# ADDITIONAL_VOLUMES=(
+#     "$HOME/.npmrc:/home/dev/.npmrc:ro"
+# )
+#
+# Your ~/.npmrc should include:
+# minimum-release-age-exclude[]=@your-org/*
+# minimum-release-age-exclude[]=your-trusted-package
+#
+# To disable time-based protection entirely (not recommended):
+# Create ~/.npmrc with: minimum-release-age=0
+# and mount it as shown above
+#
+# Note: Safe Chain malware scanning cannot be disabled and provides
+# critical protection against known malicious packages.
+
 # Custom container name (optional)
 # If not set, it will be generated from the current directory name
 # CONTAINER_NAME="my-project-dev"

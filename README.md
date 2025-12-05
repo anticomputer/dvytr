@@ -6,12 +6,66 @@ A bash-based tool for spinning up fully-featured development Docker containers w
 
 - **Multi-language Support**: C/C++, Go, Rust, Python 3, Node.js, TypeScript
 - **Modern Package Managers**: pnpm (primary), npm, pip, cargo, go modules
+- **Supply Chain Security**: Built-in protection against malicious packages with two-layer defense
 - **Cross-Platform**: Works on both Linux and MacOS
 - **Automatic Mounting**: Current directory auto-mounted to `/workspace`
 - **Dedicated User**: Non-root `dev` user with sudo access for better security
 - **Configurable**: Port forwarding, environment variables, and volume mounts
 - **Password Manager Integration**: Native support for passage and pass password managers with `passage://` and `pass://` syntax
 - **Easy Management**: Simple commands for start, stop, shell access, and cleanup
+
+## Supply Chain Security
+
+DevYeeter includes **two layers of supply chain protection** to defend against malicious packages:
+
+### Layer 1: Time-Based Protection (pnpm)
+
+- **What it does**: Prevents installation of npm packages published within the last 24 hours
+- **Why it matters**: Most malicious packages are detected and removed within hours of publication
+- **How it works**: Configured globally as `minimum-release-age=1440` (minutes)
+- **Impact**: Transparent - your package manager commands work normally, but block recent malicious packages
+
+### Layer 2: Real-Time Malware Scanning (Aikido Safe Chain)
+
+- **What it does**: Scans all npm/pnpm/yarn and pip/pip3/uv packages against a threat intelligence database
+- **Why it matters**: Catches known malware in older packages and deep dependency chains
+- **How it works**: Intercepts package downloads and blocks known malicious packages before installation
+- **Impact**: Minimal overhead, works transparently with all package managers
+
+### What This Protects Against
+
+- Supply chain attacks (compromised packages, typosquatting, malicious forks)
+- Credential theft and backdoors in dependencies
+- Malware in transitive (indirect) dependencies
+- Zero-day packages (during the critical first 24 hours after publication)
+
+### Customizing Security Settings
+
+**For internal or trusted packages that need immediate updates:**
+
+Create a `~/.npmrc` file on your host machine:
+```bash
+# Allow your organization's packages to bypass the 24-hour delay
+minimum-release-age-exclude[]=@your-org/*
+minimum-release-age-exclude[]=your-trusted-package
+```
+
+Then mount it into your container:
+```bash
+# .dvytr.conf
+ADDITIONAL_VOLUMES=(
+    "$HOME/.npmrc:/home/dev/.npmrc:ro"
+)
+```
+
+**To disable time-based protection (not recommended):**
+
+Create `~/.npmrc` with `minimum-release-age=0` and mount it as shown above. Note that Safe Chain malware scanning will still protect you.
+
+### References
+
+- [pnpm minimum-release-age documentation](https://pnpm.io/npmrc#minimum-release-age)
+- [Aikido Safe Chain on GitHub](https://github.com/AikidoSec/safe-chain)
 
 ## Prerequisites
 
@@ -442,14 +496,22 @@ The container comes pre-installed with:
 ### Development Tools
 - **Debuggers**: gdb, lldb, valgrind
 - **Build Tools**: make, cmake, pkg-config
-- **Version Control**: git
+- **Version Control**: git, GitHub CLI (gh)
 - **Editors**: vim, emacs (command-line), nano
+- **Terminal**: tmux for session management
+- **Modern CLI**: ripgrep (rg), fd-find for fast searching
 - **Utilities**: curl, wget, jq, tree, htop
+- **Security**: Aikido Safe Chain for supply chain protection
+
+### Database Clients
+- **PostgreSQL**: psql client
+- **Redis**: redis-cli
+- **MySQL**: mysql client
 
 ### System
 - **User**: Dedicated `dev` user with dynamic UID/GID mapping and sudo access
 - **Shell**: bash
-- **Base**: Ubuntu 22.04 LTS
+- **Base**: Ubuntu 24.04 LTS
 - **Permission Handling**: Automatic UID/GID adjustment via entrypoint script
 
 ## Usage Examples

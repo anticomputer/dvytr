@@ -45,6 +45,27 @@ else
     chown -R dev:dev /home/dev 2>/dev/null || true
 fi
 
+# Verify Safe Chain is properly configured after UID/GID changes
+# Safe Chain provides supply chain protection by intercepting package downloads
+if [ -d "/home/dev/.safe-chain" ]; then
+    echo "[dvytr] Verifying Safe Chain configuration"
+
+    # Ensure Safe Chain binary is executable
+    if [ -f "/home/dev/.safe-chain/safe-chain" ]; then
+        chmod +x /home/dev/.safe-chain/safe-chain 2>/dev/null || true
+    fi
+
+    # Verify shell aliases are present in bashrc
+    if ! grep -q "safe-chain" /home/dev/.bashrc 2>/dev/null; then
+        echo "[dvytr] WARNING: Safe Chain aliases not found in .bashrc"
+        echo "[dvytr] Supply chain protection may not be active"
+    else
+        echo "[dvytr] Safe Chain supply chain protection active"
+    fi
+else
+    echo "[dvytr] WARNING: Safe Chain not found at /home/dev/.safe-chain"
+fi
+
 # Start socat port forwards if configured
 # Expected format: SOCAT_FORWARD_0="5725:127.0.0.1:5724" SOCAT_FORWARD_1="8080:127.0.0.1:3000" etc.
 i=0
