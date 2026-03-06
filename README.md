@@ -389,7 +389,8 @@ DevYeeter integrates with popular Unix password managers and macOS Keychain, all
 
 **Prerequisites for macOS Keychain:**
 1. macOS only (uses the built-in `security` command)
-2. Add secrets: `security add-generic-password -s "service-name" -a "account-name" -w "<your-secret>"`
+2. Create the entry: `security add-generic-password -s "service-name" -a "account-name"`
+3. Open **Keychain Access** app, find the entry, and set the password value
 
 **Usage:**
 
@@ -485,7 +486,9 @@ echo $DATABASE_PASSWORD  # Shows the actual secret value
 
 ```bash
 # Store a token in your macOS Keychain
-security add-generic-password -s "github" -a "copilot-token" -w "ghp_your_token_here"
+# Store a token in your macOS Keychain
+security add-generic-password -s "github" -a "copilot-token"
+# Then open Keychain Access app, find the "github" entry, and set the password value
 
 # Reference it in .dvytr.conf or .env
 echo 'ENV_VARS=("GITHUB_TOKEN=keychain://github/copilot-token")' > .dvytr.conf

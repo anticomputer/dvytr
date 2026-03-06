@@ -78,7 +78,8 @@ ENV_VARS=(
     #
     # macOS Keychain (uses 'security' command, macOS only):
     # "API_KEY=keychain://my-app/api-key"
-    # Store with: security add-generic-password -s "my-app" -a "api-key" -w "<secret>"
+    # Store with: security add-generic-password -s "my-app" -a "api-key"
+    # Then set the value in Keychain Access app
 )
 
 # Additional volume mounts
@@ -219,7 +220,8 @@ INIT_SCRIPT=""
 #
 # Prerequisites for macOS Keychain:
 # 1. macOS only (uses the 'security' command)
-# 2. Add secrets: security add-generic-password -s "github" -a "copilot-token" -w "<your-secret>"
-# 3. Reference as: keychain://github/copilot-token (format: keychain://service/account)
+# 2. Create entry: security add-generic-password -s "github" -a "copilot-token"
+# 3. Open Keychain Access app, find the entry, and set the password value
+# 4. Reference as: keychain://github/copilot-token (format: keychain://service/account)
 #
 # Secrets are retrieved when running 'dvytr run' before container creation

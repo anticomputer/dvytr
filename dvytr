@@ -251,7 +251,8 @@ resolve_keychain_secrets() {
             local secret
             if ! secret=$(security find-generic-password -s "$service_name" -a "$account_name" -w 2>&1); then
                 print_error "Failed to retrieve Keychain secret: service=$service_name account=$account_name"
-                print_info "Add it with: security add-generic-password -s \"$service_name\" -a \"$account_name\" -w \"<your-secret>\""
+                print_info "Add it with: security add-generic-password -s \"$service_name\" -a \"$account_name\""
+                print_info "Then set the value in Keychain Access app"
                 exit 1
             fi
 
