@@ -66,6 +66,13 @@ else
     echo "[dvytr] WARNING: Safe Chain not found at /home/dev/.safe-chain"
 fi
 
+# Verify Copilot CLI is available after UID/GID changes
+if command -v copilot >/dev/null 2>&1; then
+    echo "[dvytr] GitHub Copilot CLI available"
+else
+    echo "[dvytr] NOTE: Copilot CLI not found in PATH"
+fi
+
 # Start socat port forwards if configured
 # Expected format: SOCAT_FORWARD_0="5725:127.0.0.1:5724" SOCAT_FORWARD_1="8080:127.0.0.1:3000" etc.
 i=0

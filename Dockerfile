@@ -159,6 +159,11 @@ ENV PATH="${GOPATH}/bin:${PATH}"
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
 ENV PATH="/home/dev/.cargo/bin:${PATH}"
 
+# Install GitHub Copilot CLI (coding agent)
+# Provides AI-assisted development directly in the terminal via the `copilot` command
+# Authentication is handled at runtime via GITHUB_TOKEN env var or interactive /login
+RUN /home/dev/.local/share/pnpm/pnpm add -g @github/copilot
+
 # Install Aikido Safe Chain for real-time malware scanning
 # This provides supply chain protection by intercepting package downloads
 # and checking them against a threat intelligence database

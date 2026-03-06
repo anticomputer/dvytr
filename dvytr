@@ -212,6 +212,66 @@ resolve_pass_secrets() {
     ENV_VARS=("${resolved_vars[@]}")
 }
 
+# Resolve macOS Keychain secrets
+# Processes ENV_VARS array and replaces "keychain://service/account" with actual secrets
+resolve_keychain_secrets() {
+    # First check if any keychain:// references exist
+    local has_keychain_refs=false
+    for env in "${ENV_VARS[@]}"; do
+        if [[ "$env" =~ keychain:// ]]; then
+            has_keychain_refs=true
+            break
+        fi
+    done
+
+    # If no keychain references, skip this function
+    if [[ "$has_keychain_refs" == false ]]; then
+        return 0
+    fi
+
+    # Check if security command is available (macOS only)
+    if ! command -v security >/dev/null 2>&1; then
+        print_error "security command not found but keychain:// reference detected in configuration"
+        print_info "macOS Keychain is only available on macOS"
+        exit 1
+    fi
+
+    # Process each ENV_VAR for keychain:// references
+    local resolved_vars=()
+    for env in "${ENV_VARS[@]}"; do
+        # Match pattern: VAR_NAME=keychain://service/account
+        if [[ "$env" =~ ^([^=]+)=keychain://([^/]+)/(.+)$ ]]; then
+            local var_name="${BASH_REMATCH[1]}"
+            local service_name="${BASH_REMATCH[2]}"
+            local account_name="${BASH_REMATCH[3]}"
+
+            print_info "Retrieving secret from macOS Keychain: service=$service_name account=$account_name"
+
+            # Retrieve secret from Keychain
+            local secret
+            if ! secret=$(security find-generic-password -s "$service_name" -a "$account_name" -w 2>&1); then
+                print_error "Failed to retrieve Keychain secret: service=$service_name account=$account_name"
+                print_info "Add it with: security add-generic-password -s \"$service_name\" -a \"$account_name\""
+                print_info "Then set the value in Keychain Access app"
+                exit 1
+            fi
+
+            if [[ -z "$secret" ]]; then
+                print_warning "Empty secret retrieved from Keychain: service=$service_name account=$account_name"
+            fi
+
+            # Add resolved variable (secret is not echoed for security)
+            resolved_vars+=("${var_name}=${secret}")
+        else
+            # Not a keychain reference, keep as-is
+            resolved_vars+=("$env")
+        fi
+    done
+
+    # Replace ENV_VARS with resolved values
+    ENV_VARS=("${resolved_vars[@]}")
+}
+
 # Generate container name based on current directory
 generate_container_name() {
     local dir_name
@@ -269,6 +329,7 @@ cmd_run() {
     load_env_file
     resolve_passage_secrets
     resolve_pass_secrets
+    resolve_keychain_secrets
 
     # Use custom name if provided, otherwise generate from directory
     CONTAINER_NAME="${CONTAINER_NAME:-$(generate_container_name)}"
@@ -525,20 +586,23 @@ ENVIRONMENT VARIABLES:
 
 PASSWORD MANAGERS:
     DevYeeter supports retrieving secrets from password managers.
-    Use 'passage://' or 'pass://' prefix in environment variables:
+    Use 'passage://', 'pass://', or 'keychain://' prefix in environment variables:
 
     In .dvytr.conf:
     ENV_VARS=("API_KEY=passage://services/api/key")
     ENV_VARS=("API_KEY=pass://services/api/key")
+    ENV_VARS=("API_KEY=keychain://service-name/account-name")
 
     In .env file:
     API_KEY=passage://services/api/key          # Using passage (age encryption)
     DATABASE_PASSWORD=pass://databases/postgres # Using pass (GPG encryption)
+    GITHUB_TOKEN=keychain://github/token        # Using macOS Keychain
 
     Secrets are retrieved when running 'dvytr run' before container creation.
 
     Install passage: https://github.com/FiloSottile/passage
     Install pass: https://www.passwordstore.org/
+    macOS Keychain: Built-in on macOS (uses 'security' command)
 
 EXAMPLES:
     # Start a development container
@@ -564,6 +628,7 @@ INSTALLED TOOLS:
     - TypeScript (tsc, ts-node)
     - Go $(grep 'GO_VERSION=' "${SCRIPT_DIR}/Dockerfile" | cut -d'=' -f2 || echo "")
     - Rust (cargo, rustc)
+    - GitHub Copilot CLI (copilot command - AI coding agent)
     - Editors: vim, emacs, nano
     - Tools: git, curl, wget, jq, tree, htop
 
