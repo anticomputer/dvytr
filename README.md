@@ -11,7 +11,8 @@ A bash-based tool for spinning up fully-featured development Docker containers w
 - **Automatic Mounting**: Current directory auto-mounted to `/workspace`
 - **Dedicated User**: Non-root `dev` user with sudo access for better security
 - **Configurable**: Port forwarding, environment variables, and volume mounts
-- **Password Manager Integration**: Native support for passage and pass password managers with `passage://` and `pass://` syntax
+- **Password Manager Integration**: Native support for passage, pass, and macOS Keychain with `passage://`, `pass://`, and `keychain://` syntax
+- **AI Assistance**: GitHub Copilot CLI pre-installed for AI-powered development in the terminal
 - **Easy Management**: Simple commands for start, stop, shell access, and cleanup
 
 ## Supply Chain Security
@@ -368,12 +369,13 @@ These variables will be automatically injected into the container environment wh
 
 ### Password Manager Integration
 
-DevYeeter integrates with popular Unix password managers, allowing you to securely store secrets and reference them in your configuration without committing sensitive data to your repository.
+DevYeeter integrates with popular Unix password managers and macOS Keychain, allowing you to securely store secrets and reference them in your configuration without committing sensitive data to your repository.
 
-**Supported Password Managers:**
+**Supported Secret Stores:**
 
 - **[passage](https://github.com/FiloSottile/passage)**: Modern password manager using age encryption (faster, simpler)
 - **[pass](https://www.passwordstore.org/)**: Standard Unix password manager using GPG encryption (widely adopted)
+- **macOS Keychain**: Built-in macOS secret storage (uses `security` command)
 
 **Prerequisites for passage:**
 1. Install passage: https://github.com/FiloSottile/passage
@@ -385,9 +387,13 @@ DevYeeter integrates with popular Unix password managers, allowing you to secure
 2. Initialize your pass store: `pass init <gpg-key-id>`
 3. Add secrets to pass: `pass insert services/myapp/api-key`
 
+**Prerequisites for macOS Keychain:**
+1. macOS only (uses the built-in `security` command)
+2. Add secrets: `security add-generic-password -s "service-name" -a "account-name" -w "<your-secret>"`
+
 **Usage:**
 
-Use the `passage://` or `pass://` prefix in environment variables to automatically retrieve secrets:
+Use the `passage://`, `pass://`, or `keychain://` prefix in environment variables to automatically retrieve secrets:
 
 ```bash
 # .dvytr.conf
@@ -399,6 +405,8 @@ ENV_VARS=(
     # Using pass:
     "JWT_SECRET=pass://secrets/myapp/jwt"
     "AWS_SECRET_ACCESS_KEY=pass://aws/credentials/secret"
+    # Using macOS Keychain:
+    "GITHUB_TOKEN=keychain://github/copilot-token"
 )
 ```
 
@@ -413,12 +421,14 @@ DATABASE_PASSWORD=passage://databases/postgres/main
 # Using pass (GPG encryption):
 JWT_SECRET=pass://secrets/myapp/jwt
 AWS_SECRET_ACCESS_KEY=pass://aws/credentials/secret
+# Using macOS Keychain:
+GITHUB_TOKEN=keychain://github/copilot-token
 ```
 
 **How it works:**
 
-1. When you run `dvytr run`, DevYeeter detects any `passage://` or `pass://` prefixed values
-2. For each one, it runs `passage show <path>` or `pass show <path>` to retrieve the secret
+1. When you run `dvytr run`, DevYeeter detects any `passage://`, `pass://`, or `keychain://` prefixed values
+2. For each one, it runs the appropriate command to retrieve the secret (`passage show`, `pass show`, or `security find-generic-password`)
 3. The secret replaces the reference before the container is created
 4. Secrets are passed securely to the container as environment variables
 
@@ -471,14 +481,31 @@ dvytr shell
 echo $DATABASE_PASSWORD  # Shows the actual secret value
 ```
 
+**Example workflow with macOS Keychain:**
+
+```bash
+# Store a token in your macOS Keychain
+security add-generic-password -s "github" -a "copilot-token" -w "ghp_your_token_here"
+
+# Reference it in .dvytr.conf or .env
+echo 'ENV_VARS=("GITHUB_TOKEN=keychain://github/copilot-token")' > .dvytr.conf
+
+# Start container - Keychain may prompt for access
+dvytr run
+
+# Inside container, the token is available
+dvytr shell
+echo $GITHUB_TOKEN  # Shows the actual token value
+```
+
 **Benefits:**
 
 - Keep secrets out of version control
 - Centralized secret management across all projects
-- Choose your preferred encryption: age (passage) or GPG (pass)
+- Choose your preferred store: age (passage), GPG (pass), or macOS Keychain
 - Works seamlessly with existing password manager workflows
 - No need to manually copy-paste secrets into config files
-- Mix and match both password managers in the same project
+- Mix and match all three secret stores in the same project
 
 ## Installed Tools
 
@@ -497,6 +524,7 @@ The container comes pre-installed with:
 - **Debuggers**: gdb, lldb, valgrind
 - **Build Tools**: make, cmake, pkg-config
 - **Version Control**: git, GitHub CLI (gh)
+- **AI Assistance**: GitHub Copilot CLI (copilot)
 - **Editors**: vim, emacs (command-line), nano
 - **Terminal**: tmux for session management
 - **Modern CLI**: ripgrep (rg), fd-find for fast searching

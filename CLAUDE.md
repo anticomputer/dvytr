@@ -36,6 +36,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
    - Verifies Safe Chain configuration after UID/GID changes (entrypoint.sh:48-67)
    - Handles socat port forwards, custom PATH directories, and initialization scripts
 
+4. **GitHub Copilot CLI**
+   - Installed via npm: `npm install -g @github/copilot`
+   - Binary available globally in PATH (npm global bin)
+   - Requires GitHub authentication at runtime (not build time)
+   - Auth options: mount `~/.copilot` from host, `GITHUB_TOKEN` env var, or interactive `/login`
+   - Verified by entrypoint.sh after UID/GID changes
+
 ### Key Design Patterns
 
 **One Image, Many Containers**
@@ -155,6 +162,13 @@ cd ~/projects/tmp && /path/to/dvytr run  # Different hash!
 - `load_env_file()`: Parses `.env` line-by-line, validates format
   - Regex: `^[A-Za-z_][A-Za-z0-9_]*=`
   - Adds validated lines to `ENV_VARS[]` array
+
+### Secret Resolution
+- Three resolvers run in sequence during `cmd_run()`: `resolve_passage_secrets()`, `resolve_pass_secrets()`, `resolve_keychain_secrets()`
+- `passage://path` → runs `passage show <path>` on host
+- `pass://path` → runs `pass show <path>` on host
+- `keychain://service/account` → runs `security find-generic-password -s <service> -a <account> -w` on host (macOS only)
+- All resolve before container creation; secrets are injected as `-e` flags to `docker run`
 
 ### Docker Run Flow (dvytr:143-228)
 1. Load config and .env
